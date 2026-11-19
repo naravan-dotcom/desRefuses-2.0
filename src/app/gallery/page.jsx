@@ -1,6 +1,6 @@
 export default function GalleryPage() {
   return (
-    <main className="min-h-screen p-6 sm:p-10">
+    <main className="p-6 sm:p-10">
       <div className="mx-auto max-w-6xl space-y-4">
         <div className="h-16 border" />
         <div className="h-24 border" />
