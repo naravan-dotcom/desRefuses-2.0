@@ -1,19 +1,12 @@
-export default function HomePage() {
+﻿export default function IntroPage() {
   return (
-    <main className="min-h-screen p-6 sm:p-10">
-      <div className="mx-auto max-w-6xl space-y-4">
-        <div className="h-16 border" />
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-72 border" />
-          <div className="h-72 border" />
-        </div>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="aspect-[4/5] border" />
-          ))}
-        </div>
-        <div className="h-20 border" />
-      </div>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-paper px-6 text-ink">
+      <img
+        src="/desrefuses-mark.png"
+        alt="desRefusés"
+        className="h-20 w-20 object-contain"
+      />
+      <h1 className="mt-6 text-3xl font-semibold tracking-tight">desRefusés</h1>
     </main>
   );
 }

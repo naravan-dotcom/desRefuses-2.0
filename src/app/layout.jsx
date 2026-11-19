@@ -1,7 +1,6 @@
-import { Geist, Geist_Mono } from "next/font/google";
+﻿import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/navbar";
-import Footer from "@/components/footer";
+import SiteShell from "@/components/site-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "desRefusés 2.0",
+  title: "desRefusAcs 2.0",
   description: "Galeri digital tanpa dewan juri.",
 };
 
@@ -25,9 +24,7 @@ export default function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-paper text-ink">
-        <Navbar />
-        <div className="flex-1">{children}</div>
-        <Footer />
+        <SiteShell>{children}</SiteShell>
       </body>
     </html>
   );
