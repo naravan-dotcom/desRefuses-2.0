@@ -11,11 +11,13 @@ export default function SiteShell({ children }) {
     return <>{children}</>;
   }
 
+  const isDashboard = pathname.startsWith("/dashboard");
+
   return (
     <>
       <Navbar />
       <div className="flex-1">{children}</div>
-      <Footer />
+      {!isDashboard && <Footer />}
     </>
   );
 }

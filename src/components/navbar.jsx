@@ -4,6 +4,7 @@ const links = [
   { label: "Beranda", href: "/home" },
   { label: "Galeri", href: "/gallery" },
   { label: "Tantangan", href: "/challenges" },
+  { label: "Dashboard", href: "/dashboard" },
 ];
 
 export default function Navbar() {
