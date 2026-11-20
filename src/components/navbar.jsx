@@ -1,16 +1,16 @@
 import Link from "next/link";
 
 const links = [
+  { label: "Beranda", href: "/home" },
   { label: "Galeri", href: "/gallery" },
   { label: "Tantangan", href: "/challenges" },
-  { label: "Filosofi", href: "/philosophy" },
 ];
 
 export default function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-ink/15 bg-paper/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-6 sm:px-10">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/home" className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-brand" />
           <span className="font-semibold tracking-tight">desRefusés</span>
           <span className="border border-ink/20 px-1.5 py-0.5 text-[10px] text-ink/60">

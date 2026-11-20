@@ -23,14 +23,14 @@ export default function Footer() {
             Jelajahi
           </p>
           <div className="mt-4 flex flex-col gap-2 text-sm text-paper/65">
+            <Link href="/home" className="hover:text-paper">
+              Beranda
+            </Link>
             <Link href="/gallery" className="hover:text-paper">
               Galeri publik
             </Link>
             <Link href="/challenges" className="hover:text-paper">
               Tantangan
-            </Link>
-            <Link href="/philosophy" className="hover:text-paper">
-              Filosofi &amp; peran
             </Link>
           </div>
         </div>
