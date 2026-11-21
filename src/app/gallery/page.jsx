@@ -1,38 +1,60 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { loadDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
-const seed = createSeedDb();
-const categories = ["Semua", ...seed.categories.map((category) => category.name)];
+const initialSeed = createSeedDb();
+const categories = ["Semua", ...initialSeed.categories.map((category) => category.name)];
 const categoryIds = Object.fromEntries(
-  seed.categories.map((category) => [category.name, category.id]),
+  initialSeed.categories.map((category) => [category.name, category.id]),
 );
-const creators = Object.fromEntries(seed.users.map((user) => [user.id, user.name]));
-const commentCounts = seed.comments.reduce((counts, comment) => {
-  counts[comment.artworkId] = (counts[comment.artworkId] ?? 0) + 1;
-  return counts;
-}, {});
 
 export default function GalleryPage() {
+  const [db, setDb] = useState(() => createSeedDb());
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("Semua");
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDb(loadDb());
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const creators = useMemo(
+    () => Object.fromEntries(db.users.map((user) => [user.id, user.name])),
+    [db],
+  );
+
+  const categoryNames = useMemo(
+    () => Object.fromEntries(db.categories.map((category) => [category.id, category.name])),
+    [db],
+  );
+
+  const commentCounts = useMemo(() => {
+    return db.comments.reduce((counts, comment) => {
+      counts[comment.artworkId] = (counts[comment.artworkId] ?? 0) + 1;
+      return counts;
+    }, {});
+  }, [db]);
+
   const artworks = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return seed.artworks.filter((artwork) => {
+    return db.artworks.filter((artwork) => {
       const matchCategory =
         activeCategory === "Semua" ||
         artwork.categoryId === categoryIds[activeCategory];
       if (!matchCategory) return false;
       if (!needle) return true;
+
       const creator = creators[artwork.userId] ?? "";
       return [artwork.title, creator, ...artwork.tags].some((value) =>
         String(value).toLowerCase().includes(needle),
       );
     });
-  }, [query, activeCategory]);
+  }, [db, query, activeCategory, creators]);
 
   return (
     <main className="px-6 py-16 sm:px-10">
@@ -95,7 +117,7 @@ export default function GalleryPage() {
                   </div>
                   <div className="p-3">
                     <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                      {seed.categories.find((item) => item.id === artwork.categoryId)?.name}
+                      {categoryNames[artwork.categoryId]}
                     </p>
                     <h3 className="mt-1 text-sm font-medium leading-snug">
                       {artwork.title}
