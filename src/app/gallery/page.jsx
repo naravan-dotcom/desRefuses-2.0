@@ -1,17 +1,39 @@
-const categories = ["Semua", "Lukis", "Digital", "Patung", "Fotografi", "Tekstil"];
+"use client";
 
-const artworks = [
-  { title: "Deconstruction of Dogma", artist: "Sora Vane", category: "Lukis" },
-  { title: "Static Noise", artist: "Aethelgard", category: "Digital" },
-  { title: "Architectural Ghost of 1863", artist: "Clara Mond", category: "Digital" },
-  { title: "Bronze Rebellion", artist: "Rian K.", category: "Patung" },
-  { title: "Frayed Memory", artist: "Lina Arka", category: "Tekstil" },
-  { title: "Glass Horizon", artist: "Dimas Noor", category: "Fotografi" },
-  { title: "Unframed Echo", artist: "Mara Sel", category: "Lukis" },
-  { title: "Paper Cathedral", artist: "Jonas Re", category: "Patung" },
-];
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { createSeedDb } from "@/lib/seed";
+
+const seed = createSeedDb();
+const categories = ["Semua", ...seed.categories.map((category) => category.name)];
+const categoryIds = Object.fromEntries(
+  seed.categories.map((category) => [category.name, category.id]),
+);
+const creators = Object.fromEntries(seed.users.map((user) => [user.id, user.name]));
+const commentCounts = seed.comments.reduce((counts, comment) => {
+  counts[comment.artworkId] = (counts[comment.artworkId] ?? 0) + 1;
+  return counts;
+}, {});
 
 export default function GalleryPage() {
+  const [query, setQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Semua");
+
+  const artworks = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return seed.artworks.filter((artwork) => {
+      const matchCategory =
+        activeCategory === "Semua" ||
+        artwork.categoryId === categoryIds[activeCategory];
+      if (!matchCategory) return false;
+      if (!needle) return true;
+      const creator = creators[artwork.userId] ?? "";
+      return [artwork.title, creator, ...artwork.tags].some((value) =>
+        String(value).toLowerCase().includes(needle),
+      );
+    });
+  }, [query, activeCategory]);
+
   return (
     <main className="px-6 py-16 sm:px-10">
       <div className="mx-auto max-w-6xl space-y-8">
@@ -32,40 +54,68 @@ export default function GalleryPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <input
               type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="Cari karya atau kreator"
               className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink sm:max-w-xs"
             />
             <div className="flex flex-wrap gap-2">
-              {categories.map((category, index) => (
-                <span
+              {categories.map((category) => (
+                <button
+                  type="button"
                   key={category}
-                  className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] ${
-                    index === 0
+                  onClick={() => setActiveCategory(category)}
+                  className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                    category === activeCategory
                       ? "border-ink bg-ink text-paper"
-                      : "border-ink/20 text-ink/60"
+                      : "border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
                   }`}
                 >
                   {category}
-                </span>
+                </button>
               ))}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {artworks.map((art, index) => (
-              <article key={index} className="border border-ink/15 bg-white">
-                <div className="aspect-[4/5] bg-ink/5" />
-                <div className="p-3">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                    {art.category}
-                  </p>
-                  <h3 className="mt-1 text-sm font-medium leading-snug">
-                    {art.title}
-                  </h3>
-                  <p className="mt-1 text-xs text-ink/55">{art.artist}</p>
-                </div>
-              </article>
+            {artworks.map((artwork) => (
+              <Link
+                key={artwork.id}
+                href={`/artwork/${artwork.id}`}
+                className="group block border border-ink/15 bg-white transition-colors hover:border-ink/40"
+              >
+                <article>
+                  <div className="aspect-[4/5] overflow-hidden bg-ink/5">
+                    <img
+                      src={artwork.image}
+                      alt={`Karya ${artwork.title} oleh ${creators[artwork.userId] ?? "kreator"}`}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    />
+                  </div>
+                  <div className="p-3">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+                      {seed.categories.find((item) => item.id === artwork.categoryId)?.name}
+                    </p>
+                    <h3 className="mt-1 text-sm font-medium leading-snug">
+                      {artwork.title}
+                    </h3>
+                    <p className="mt-1 text-xs text-ink/55">
+                      {creators[artwork.userId]}
+                    </p>
+                    <div className="mt-3 flex items-center gap-3 border-t border-ink/10 pt-2 text-[10px] uppercase tracking-[0.12em] text-ink/45">
+                      <span>{artwork.likes} suka</span>
+                      <span>{commentCounts[artwork.id] ?? 0} komentar</span>
+                    </div>
+                  </div>
+                </article>
+              </Link>
             ))}
+            {artworks.length === 0 && (
+              <p className="col-span-full border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
+                Tidak ada karya yang cocok.
+              </p>
+            )}
           </div>
         </section>
       </div>
