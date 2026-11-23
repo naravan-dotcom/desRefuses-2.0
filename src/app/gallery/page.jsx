@@ -5,12 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { loadDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
-const initialSeed = createSeedDb();
-const categories = ["Semua", ...initialSeed.categories.map((category) => category.name)];
-const categoryIds = Object.fromEntries(
-  initialSeed.categories.map((category) => [category.name, category.id]),
-);
-
 export default function GalleryPage() {
   const [db, setDb] = useState(() => createSeedDb());
   const [query, setQuery] = useState("");
@@ -22,6 +16,18 @@ export default function GalleryPage() {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
+
+  const categories = useMemo(
+    () => ["Semua", ...db.categories.map((category) => category.name)],
+    [db],
+  );
+
+  const categoryIds = useMemo(
+    () => Object.fromEntries(db.categories.map((category) => [category.name, category.id])),
+    [db],
+  );
+
+  const activeName = categories.includes(activeCategory) ? activeCategory : "Semua";
 
   const creators = useMemo(
     () => Object.fromEntries(db.users.map((user) => [user.id, user.name])),
@@ -44,8 +50,8 @@ export default function GalleryPage() {
     const needle = query.trim().toLowerCase();
     return db.artworks.filter((artwork) => {
       const matchCategory =
-        activeCategory === "Semua" ||
-        artwork.categoryId === categoryIds[activeCategory];
+        activeName === "Semua" ||
+        artwork.categoryId === categoryIds[activeName];
       if (!matchCategory) return false;
       if (!needle) return true;
 
@@ -54,7 +60,7 @@ export default function GalleryPage() {
         String(value).toLowerCase().includes(needle),
       );
     });
-  }, [db, query, activeCategory, creators]);
+  }, [db, query, activeName, creators, categoryIds]);
 
   return (
     <main className="px-6 py-16 sm:px-10">
@@ -88,7 +94,7 @@ export default function GalleryPage() {
                   key={category}
                   onClick={() => setActiveCategory(category)}
                   className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                    category === activeCategory
+                    category === activeName
                       ? "border-ink bg-ink text-paper"
                       : "border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
                   }`}
