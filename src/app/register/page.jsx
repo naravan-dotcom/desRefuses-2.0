@@ -93,7 +93,7 @@ export default function RegisterPage() {
     }
 
     setSuccess(
-      "Pengajuan kurator berhasil. Akun menunggu persetujuan Admin sebelum bisa masuk.",
+      "Pengajuan kurator berhasil. Masuk untuk melihat status akun; dashboard menunggu persetujuan Admin.",
     );
     setName("");
     setUsername("");

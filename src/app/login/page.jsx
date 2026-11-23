@@ -20,18 +20,19 @@ export default function LoginPage() {
     const user = db.users.find(
       (item) =>
         item.email.toLowerCase() === email.trim().toLowerCase() &&
-        item.password === password &&
-        item.status === "approved",
+        item.password === password,
     );
 
     if (!user) {
-      setError("Email atau password salah, atau akun belum disetujui.");
+      setError("Email atau password salah.");
       return;
     }
 
     setSessionId(user.id);
     notifySessionChange();
-    if (user.role === "admin") router.push("/dashboard");
+    if (user.role === "curator" && user.status !== "approved") {
+      router.push("/pending");
+    } else if (user.role === "admin") router.push("/dashboard");
     else if (user.role === "curator") router.push("/dashboard/challenges");
     else router.push("/home");
   }
@@ -109,6 +110,8 @@ export default function LoginPage() {
           <p>Member — sora@desrefuses.id / member123</p>
           <p>Admin — admin@desrefuses.id / admin123</p>
           <p>Kurator — musee@desrefuses.id / curator123</p>
+          <p>Kurator pending — dao@desrefuses.id / curator123</p>
+          <p>Kurator rejected — nol@desrefuses.id / curator123</p>
         </div>
       </div>
     </main>
