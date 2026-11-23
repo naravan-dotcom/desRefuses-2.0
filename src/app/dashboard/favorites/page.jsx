@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getSessionId, loadDb, setSessionId } from "@/lib/local-data";
+import { getSessionId, loadDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
 export default function DashboardFavoritesPage() {
@@ -29,33 +29,17 @@ export default function DashboardFavoritesPage() {
       .filter(Boolean);
   }, [db, user]);
 
-  function logout() {
-    setSessionId(null);
-    setSessionIdState(null);
-  }
-
   return (
     <>
       <header className="space-y-2">
         <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
           Member
         </p>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Favorit</h1>
-            <p className="text-sm leading-relaxed text-ink/55">
-              Karya yang Anda simpan dari galeri.
-            </p>
-          </div>
-          {user && (
-            <button
-              type="button"
-              onClick={logout}
-              className="border border-ink/20 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-ink/60"
-            >
-              Keluar
-            </button>
-          )}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Favorit</h1>
+          <p className="text-sm leading-relaxed text-ink/55">
+            Karya yang Anda simpan dari galeri.
+          </p>
         </div>
       </header>
 

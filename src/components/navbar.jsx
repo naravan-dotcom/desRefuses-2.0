@@ -1,13 +1,38 @@
-import Link from "next/link";
+"use client";
 
-const links = [
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { logout, useSession } from "@/lib/use-session";
+
+const baseLinks = [
   { label: "Beranda", href: "/home" },
   { label: "Galeri", href: "/gallery" },
   { label: "Tantangan", href: "/challenges" },
-  { label: "Dashboard", href: "/dashboard" },
 ];
 
+function dashboardLinkFor(user) {
+  if (!user) return null;
+  if (user.role === "curator" && user.status !== "approved") {
+    return { label: "Status akun", href: "/pending" };
+  }
+  return {
+    label: "Dashboard",
+    href: user.role === "curator" ? "/dashboard/challenges" : "/dashboard",
+  };
+}
+
 export default function Navbar() {
+  const router = useRouter();
+  const { user } = useSession();
+
+  const dashboardLink = dashboardLinkFor(user);
+  const links = dashboardLink ? [...baseLinks, dashboardLink] : baseLinks;
+
+  function handleLogout() {
+    logout();
+    router.push("/home");
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-ink/15 bg-paper/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-6 sm:px-10">
@@ -28,15 +53,32 @@ export default function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/login"
-            className="hidden border border-ink/20 px-3 py-2 text-xs hover:border-ink sm:inline-flex"
-          >
-            Masuk
-          </Link>
-          <Link href="/register" className="bg-ink px-3 py-2 text-xs text-paper">
-            Daftar
-          </Link>
+          {user ? (
+            <>
+              <span className="hidden max-w-40 truncate text-xs text-ink/60 sm:inline">
+                {user.name}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="border border-ink/20 px-3 py-2 text-xs hover:border-ink"
+              >
+                Keluar
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="hidden border border-ink/20 px-3 py-2 text-xs hover:border-ink sm:inline-flex"
+              >
+                Masuk
+              </Link>
+              <Link href="/register" className="bg-ink px-3 py-2 text-xs text-paper">
+                Daftar
+              </Link>
+            </>
+          )}
 
           <details className="relative md:hidden">
             <summary className="summary-clean cursor-pointer list-none border border-ink/20 px-3 py-2 text-xs">

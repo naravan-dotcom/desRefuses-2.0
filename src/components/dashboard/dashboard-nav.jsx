@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "@/lib/use-session";
 
 const groups = [
   {
     label: "Umum",
+    roles: ["admin", "member", "curator"],
     items: [{ label: "Ringkasan", href: "/dashboard" }],
   },
   {
     label: "Member",
+    roles: ["member"],
     items: [
       { label: "Karya saya", href: "/dashboard/artworks" },
       { label: "Favorit", href: "/dashboard/favorites" },
@@ -20,10 +23,12 @@ const groups = [
   },
   {
     label: "Kurator",
+    roles: ["curator"],
     items: [{ label: "Tantangan saya", href: "/dashboard/challenges" }],
   },
   {
     label: "Admin",
+    roles: ["admin"],
     items: [
       { label: "Pengguna", href: "/dashboard/users" },
       { label: "Verifikasi kurator", href: "/dashboard/curators" },
@@ -33,12 +38,25 @@ const groups = [
   },
 ];
 
+export function canOpen(role, pathname) {
+  const group = groups.find((item) =>
+    item.items.some((entry) => entry.href === pathname),
+  );
+  if (!group) return true;
+  return group.roles.includes(role);
+}
+
 export default function DashboardNav() {
   const pathname = usePathname();
+  const { user } = useSession();
+
+  if (!user) return null;
+
+  const visible = groups.filter((group) => group.roles.includes(user.role));
 
   return (
     <nav className="space-y-5">
-      {groups.map((group) => (
+      {visible.map((group) => (
         <div key={group.label}>
           <p className="mb-2 text-[10px] uppercase tracking-[0.16em] text-ink/40">
             {group.label}

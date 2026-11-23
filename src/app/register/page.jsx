@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { isoNow, loadDb, saveDb, setSessionId, uid } from "@/lib/local-data";
+import { notifySessionChange } from "@/lib/use-session";
 import { IMAGES } from "@/lib/seed";
 
 export default function RegisterPage() {
@@ -86,7 +87,8 @@ export default function RegisterPage() {
 
     if (finalRole === "member") {
       setSessionId(newUser.id);
-      router.push("/gallery");
+      notifySessionChange();
+      router.push("/home");
       return;
     }
 

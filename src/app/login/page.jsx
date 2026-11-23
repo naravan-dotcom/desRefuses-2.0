@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { loadDb, setSessionId } from "@/lib/local-data";
+import { notifySessionChange } from "@/lib/use-session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function LoginPage() {
     const db = loadDb();
     const user = db.users.find(
       (item) =>
-        item.email === email.trim() &&
+        item.email.toLowerCase() === email.trim().toLowerCase() &&
         item.password === password &&
         item.status === "approved",
     );
@@ -29,7 +30,10 @@ export default function LoginPage() {
     }
 
     setSessionId(user.id);
-    router.push("/gallery");
+    notifySessionChange();
+    if (user.role === "admin") router.push("/dashboard");
+    else if (user.role === "curator") router.push("/dashboard/challenges");
+    else router.push("/home");
   }
 
   return (
