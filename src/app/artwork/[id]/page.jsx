@@ -177,7 +177,10 @@ export default function ArtworkPage() {
     if (
       db.reports.some(
         (item) =>
-          item.type === type && item.targetId === targetId && item.reporterId === user.id,
+          item.type === type &&
+          item.targetId === targetId &&
+          item.reporterId === user.id &&
+          item.status === "open",
       )
     ) {
       setNotice("Anda sudah pernah melaporkan ini.");
