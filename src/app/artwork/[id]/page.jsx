@@ -10,6 +10,28 @@ function cloneDb(db) {
   return JSON.parse(JSON.stringify(db));
 }
 
+const months = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+function formatDate(value) {
+  if (!value) return "—";
+  const [year, month, day] = value.slice(0, 10).split("-");
+  const monthName = months[Number(month) - 1] ?? month;
+  return `${Number(day)} ${monthName} ${year}`;
+}
+
 export default function ArtworkPage() {
   const params = useParams();
   const rawId = params?.id;
@@ -317,9 +339,20 @@ export default function ArtworkPage() {
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
               {artwork.title}
             </h1>
-            <p className="text-sm text-ink/55">
-              oleh {creator?.name ?? "Kreator"} · @{creator?.username ?? "kreator"}
-            </p>
+            {creator ? (
+              <p className="text-sm text-ink/55">
+                oleh{" "}
+                <Link
+                  href={`/creator/${creator.id}`}
+                  className="text-ink underline decoration-ink/30 underline-offset-2 hover:text-brand"
+                >
+                  {creator.name}
+                </Link>{" "}
+                · @{creator.username}
+              </p>
+            ) : (
+              <p className="text-sm text-ink/55">oleh Kreator</p>
+            )}
             <p className="text-sm leading-relaxed text-ink/70">
               {artwork.description}
             </p>
@@ -345,8 +378,10 @@ export default function ArtworkPage() {
                 <p className="mt-1 text-lg font-semibold">{comments.length}</p>
               </div>
               <div className="p-3">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/40">Status</p>
-                <p className="mt-2 text-[11px] text-ink/55">Tanpa kurasi</p>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-ink/40">Diunggah</p>
+                <p className="mt-1 text-[11px] text-ink/55">
+                  {formatDate(artwork.createdAt)}
+                </p>
               </div>
             </div>
 

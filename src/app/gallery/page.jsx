@@ -107,12 +107,11 @@ export default function GalleryPage() {
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {artworks.map((artwork) => (
-              <Link
+              <article
                 key={artwork.id}
-                href={`/artwork/${artwork.id}`}
-                className="group block border border-ink/15 bg-white transition-colors hover:border-ink/40"
+                className="group border border-ink/15 bg-white transition-colors hover:border-ink/40"
               >
-                <article>
+                <Link href={`/artwork/${artwork.id}`} className="block">
                   <div className="aspect-[4/5] overflow-hidden bg-ink/5">
                     <img
                       src={artwork.image}
@@ -121,23 +120,32 @@ export default function GalleryPage() {
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                     />
                   </div>
-                  <div className="p-3">
+                  <div className="p-3 pb-2">
                     <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
                       {categoryNames[artwork.categoryId]}
                     </p>
                     <h3 className="mt-1 text-sm font-medium leading-snug">
                       {artwork.title}
                     </h3>
-                    <p className="mt-1 text-xs text-ink/55">
-                      {creators[artwork.userId]}
-                    </p>
-                    <div className="mt-3 flex items-center gap-3 border-t border-ink/10 pt-2 text-[10px] uppercase tracking-[0.12em] text-ink/45">
-                      <span>{artwork.likes} suka</span>
-                      <span>{commentCounts[artwork.id] ?? 0} komentar</span>
-                    </div>
                   </div>
-                </article>
-              </Link>
+                </Link>
+                <div className="px-3 pb-3">
+                  {creators[artwork.userId] ? (
+                    <Link
+                      href={`/creator/${artwork.userId}`}
+                      className="text-xs text-ink/55 hover:text-ink hover:underline"
+                    >
+                      {creators[artwork.userId]}
+                    </Link>
+                  ) : (
+                    <p className="text-xs text-ink/55">Kreator</p>
+                  )}
+                  <div className="mt-3 flex items-center gap-3 border-t border-ink/10 pt-2 text-[10px] uppercase tracking-[0.12em] text-ink/45">
+                    <span>{artwork.likes} suka</span>
+                    <span>{commentCounts[artwork.id] ?? 0} komentar</span>
+                  </div>
+                </div>
+              </article>
             ))}
             {artworks.length === 0 && (
               <p className="col-span-full border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
