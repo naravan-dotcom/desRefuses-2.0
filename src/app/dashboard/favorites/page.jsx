@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getSessionId, loadDb } from "@/lib/local-data";
+import { getSessionId, loadDb, saveDb, uid } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
 export default function DashboardFavoritesPage() {
   const [db, setDb] = useState(() => createSeedDb());
   const [sessionId, setSessionIdState] = useState(null);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState(() => new Set());
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -28,6 +32,52 @@ export default function DashboardFavoritesPage() {
       .map((id) => db.artworks.find((item) => item.id === id))
       .filter(Boolean);
   }, [db, user]);
+
+  const collections = user?.collections ?? [];
+
+  function toggleCollectionSelection(artworkId) {
+    setSelectedCollectionIds((current) => {
+      const next = new Set(current);
+      if (next.has(artworkId)) next.delete(artworkId);
+      else next.add(artworkId);
+      return next;
+    });
+  }
+
+  function createCollection(event) {
+    event.preventDefault();
+    const name = newCollectionName.trim();
+    if (!user) return;
+    if (!name) {
+      setError("Nama koleksi wajib diisi.");
+      return;
+    }
+    const artworkIds = favorites
+      .filter((item) => selectedCollectionIds.has(item.id))
+      .map((item) => item.id);
+    const next = loadDb();
+    const target = next.users.find((item) => item.id === user.id);
+    if (!target) return;
+    target.collections = target.collections ?? [];
+    target.collections.push({ id: uid("col"), name, artworkIds });
+    saveDb(next);
+    setDb(next);
+    setNewCollectionName("");
+    setSelectedCollectionIds(new Set());
+    setNotice("Koleksi berhasil dibuat.");
+  }
+
+  function deleteCollection(id) {
+    const next = loadDb();
+    const target = next.users.find((item) => item.id === user?.id);
+    if (!target) return;
+    target.collections = (target.collections ?? []).filter(
+      (item) => item.id !== id,
+    );
+    saveDb(next);
+    setDb(next);
+    setNotice("Koleksi dihapus.");
+  }
 
   return (
     <>
@@ -78,6 +128,107 @@ export default function DashboardFavoritesPage() {
           ))}
         </div>
       )}
+
+      <section className="space-y-4 border border-ink/15 bg-white p-5">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+            Member
+          </p>
+          <h2 className="text-xl font-semibold">Koleksi</h2>
+          <p className="text-sm text-ink/55">
+            Kelompokkan favorit Anda ke dalam koleksi bernama.
+          </p>
+        </div>
+
+        <form onSubmit={createCollection} className="space-y-3">
+          <label className="block text-xs text-ink/60">
+            Nama koleksi
+            <input
+              type="text"
+              value={newCollectionName}
+              onChange={(event) => setNewCollectionName(event.target.value)}
+              placeholder="Mis. Inspirasi Desain Karakter"
+              className="mt-1.5 w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+            />
+          </label>
+
+          {favorites.length > 0 && (
+            <div className="space-y-2">
+              {favorites.map((artwork) => (
+                <label
+                  key={artwork.id}
+                  className="flex items-center gap-2 text-xs text-ink/70"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCollectionIds.has(artwork.id)}
+                    onChange={() => toggleCollectionSelection(artwork.id)}
+                  />
+                  {artwork.title}
+                </label>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="bg-ink px-3 py-2 text-xs font-medium text-paper transition-colors hover:bg-brand"
+          >
+            Buat koleksi
+          </button>
+        </form>
+
+        {collections.length === 0 ? (
+          <p className="border border-dashed border-ink/20 p-6 text-center text-sm text-ink/45">
+            Belum ada koleksi.
+          </p>
+        ) : (
+          collections.map((collection) => (
+            <div key={collection.id} className="space-y-3 border-t border-ink/10 pt-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">{collection.name}</p>
+                <button
+                  type="button"
+                  onClick={() => deleteCollection(collection.id)}
+                  className="border border-red-600/50 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-red-700 transition-colors hover:bg-red-50"
+                >
+                  Hapus
+                </button>
+              </div>
+              {collection.artworkIds.length === 0 ? (
+                <p className="text-xs text-ink/45">Belum ada karya dalam koleksi.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                  {collection.artworkIds.map((artworkId) => {
+                    const artwork = db.artworks.find((item) => item.id === artworkId);
+                    if (!artwork) return null;
+                    return (
+                      <Link
+                        key={artworkId}
+                        href={`/artwork/${artwork.id}`}
+                        className="border border-ink/15 bg-white"
+                      >
+                        <img
+                          src={artwork.image}
+                          alt={artwork.title}
+                          loading="lazy"
+                          className="aspect-[4/3] w-full object-cover"
+                        />
+                        <div className="p-3">
+                          <p className="text-sm font-medium">{artwork.title}</p>
+                          <p className="mt-1 text-xs text-ink/50">
+                            {db.users.find((item) => item.id === artwork.userId)?.name ?? "Kreator"}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </section>
     </>
   );
 }

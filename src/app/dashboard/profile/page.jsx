@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { getSessionId, loadDb, saveDb } from "@/lib/local-data";
+import { createSeedDb } from "@/lib/seed";
 import { notifySessionChange } from "@/lib/use-session";
 
 const MAX_FILE_SIZE = 1024 * 1024;
 
 export default function DashboardProfilePage() {
   const [user, setUser] = useState(null);
+  const [db, setDb] = useState(() => createSeedDb());
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -25,6 +28,7 @@ export default function DashboardProfilePage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       const db = loadDb();
+      setDb(db);
       const current = db.users.find((item) => item.id === getSessionId());
       if (!current) return;
       setUser(current);
@@ -114,6 +118,13 @@ export default function DashboardProfilePage() {
     setAvatarName("");
     setNotice("Profil disimpan.");
   }
+
+  const followings = useMemo(() => {
+    if (!user) return [];
+    return (user.following ?? [])
+      .map((id) => db.users.find((item) => item.id === id))
+      .filter(Boolean);
+  }, [db, user]);
 
   const preview = avatarData || avatarUrl.trim() || user?.avatar || "";
 
@@ -234,6 +245,36 @@ export default function DashboardProfilePage() {
           Simpan profil
         </button>
       </form>
+
+      <section className="mt-6 space-y-3 border border-ink/15 bg-white p-5">
+        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+          Member
+        </p>
+        <h2 className="text-xl font-semibold">Kreator yang saya ikuti</h2>
+        {followings.length === 0 ? (
+          <p className="text-sm text-ink/55">Belum mengikuti kreator.</p>
+        ) : (
+          <ul className="space-y-2">
+            {followings.map((followed) => (
+              <li
+                key={followed.id}
+                className="flex items-center justify-between gap-3 border border-ink/15 px-3 py-2"
+              >
+                <div>
+                  <p className="text-sm font-medium">{followed.name}</p>
+                  <p className="text-xs text-ink/50">@{followed.username}</p>
+                </div>
+                <Link
+                  href={`/creator/${followed.id}`}
+                  className="text-[10px] uppercase tracking-[0.12em] text-ink/55 hover:text-ink"
+                >
+                  Lihat profil
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {error && (
         <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 text-xs text-red-700">

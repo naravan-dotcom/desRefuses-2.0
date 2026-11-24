@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { loadDb } from "@/lib/local-data";
+import { loadDb, saveDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
+import { useSession } from "@/lib/use-session";
 
 const months = [
   "Januari",
@@ -38,6 +39,7 @@ export default function CreatorPage() {
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
   const [db, setDb] = useState(() => createSeedDb());
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => setDb(loadDb()), 0);
@@ -47,6 +49,11 @@ export default function CreatorPage() {
   const creator = useMemo(
     () => db.users.find((user) => user.id === id),
     [db, id],
+  );
+
+  const { user } = useSession();
+  const isFollowing = Boolean(
+    user && creator && user.id !== creator.id && (user.following ?? []).includes(creator.id),
   );
 
   const artworks = useMemo(
@@ -76,6 +83,35 @@ export default function CreatorPage() {
       : creator?.role === "curator"
         ? "Kurator"
         : "Member";
+
+  function toggleFollow() {
+    if (!user) {
+      setNotice("Masuk sebagai Member untuk mengikuti kreator.");
+      return;
+    }
+    if (user.role !== "member") {
+      setNotice("Akun Admin atau Kurator hanya dapat menjelajahi profil.");
+      return;
+    }
+    if (user.id === creator.id) {
+      setNotice("Anda tidak dapat mengikuti diri sendiri.");
+      return;
+    }
+    const next = loadDb();
+    const target = next.users.find((item) => item.id === user.id);
+    if (!target) return;
+    target.following = target.following ?? [];
+    const index = target.following.indexOf(creator.id);
+    if (index >= 0) {
+      target.following.splice(index, 1);
+      setNotice(`Mengikuti ${creator.name} dihentikan.`);
+    } else {
+      target.following.push(creator.id);
+      setNotice(`${creator.name} kini diikuti.`);
+    }
+    saveDb(next);
+    setDb(next);
+  }
 
   return (
     <main className="px-6 py-12 sm:px-10">
@@ -122,6 +158,15 @@ export default function CreatorPage() {
                       {creator.bio}
                     </p>
                   )}
+                  {user && user.id !== creator.id && user.role === "member" && (
+                    <button
+                      type="button"
+                      onClick={toggleFollow}
+                      className="border border-ink/20 px-3 py-2 text-xs transition-colors hover:border-ink"
+                    >
+                      {isFollowing ? "Mengikuti" : "Ikuti"}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -164,6 +209,8 @@ export default function CreatorPage() {
                 </p>
               )}
             </section>
+
+            {notice && <p className="text-xs text-ink/55">{notice}</p>}
 
             <section className="space-y-4">
               <div className="flex items-end justify-between gap-3">
