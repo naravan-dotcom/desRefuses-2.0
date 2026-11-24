@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { loadDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
-const seed = createSeedDb();
 const filters = ["Semua", "Aktif", "Mendatang", "Selesai"];
 
 const statusLabels = {
@@ -11,14 +12,6 @@ const statusLabels = {
   upcoming: "Mendatang",
   ended: "Selesai",
 };
-
-const curators = Object.fromEntries(
-  seed.users.map((user) => [user.id, user.name]),
-);
-const submissionCounts = seed.submissions.reduce((counts, submission) => {
-  counts[submission.challengeId] = (counts[submission.challengeId] ?? 0) + 1;
-  return counts;
-}, {});
 
 function getStatus(challenge) {
   const now = new Date();
@@ -36,20 +29,52 @@ function formatDate(value) {
   return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
-function winnerTitle(id) {
-  if (!id) return null;
-  return seed.artworks.find((artwork) => artwork.id === id)?.title ?? null;
-}
-
 export default function ChallengesPage() {
+  const [db, setDb] = useState(() => createSeedDb());
   const [activeFilter, setActiveFilter] = useState("Semua");
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDb(loadDb()), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const curators = useMemo(
+    () => Object.fromEntries(db.users.map((user) => [user.id, user.name])),
+    [db],
+  );
+
+  const artworkTitles = useMemo(
+    () =>
+      Object.fromEntries(db.artworks.map((artwork) => [artwork.id, artwork.title])),
+    [db],
+  );
+
+  const submissionCounts = useMemo(
+    () =>
+      db.submissions.reduce((counts, submission) => {
+        counts[submission.challengeId] = (counts[submission.challengeId] ?? 0) + 1;
+        return counts;
+      }, {}),
+    [db],
+  );
 
   const challenges = useMemo(() => {
-    return seed.challenges.filter((challenge) => {
-      if (activeFilter === "Semua") return true;
-      return statusLabels[getStatus(challenge)] === activeFilter;
+    const needle = query.trim().toLowerCase();
+
+    return db.challenges.filter((challenge) => {
+      if (
+        activeFilter !== "Semua" &&
+        statusLabels[getStatus(challenge)] !== activeFilter
+      ) {
+        return false;
+      }
+      if (!needle) return true;
+      return [challenge.title, challenge.description, curators[challenge.curatorId] ?? ""].some(
+        (value) => String(value).toLowerCase().includes(needle),
+      );
     });
-  }, [activeFilter]);
+  }, [db, activeFilter, query, curators]);
 
   return (
     <main className="px-6 py-16 sm:px-10">
@@ -68,32 +93,42 @@ export default function ChallengesPage() {
         </section>
 
         <section className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {filters.map((filter) => (
-              <button
-                type="button"
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                  filter === activeFilter
-                    ? "border-ink bg-ink text-paper"
-                    : "border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Cari challenge atau kurator"
+              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink lg:max-w-xs"
+            />
+            <div className="flex flex-wrap gap-2">
+              {filters.map((filter) => (
+                <button
+                  type="button"
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                  className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                    filter === activeFilter
+                      ? "border-ink bg-ink text-paper"
+                      : "border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {challenges.map((challenge) => {
               const status = getStatus(challenge);
-              const winner = winnerTitle(challenge.winners?.first);
+              const winner = artworkTitles[challenge.winners?.first];
 
               return (
-                <article
+                <Link
                   key={challenge.id}
-                  className="border border-ink/15 bg-white"
+                  href={`/challenges/${challenge.id}`}
+                  className="block border border-ink/15 bg-white transition-colors hover:border-ink/40"
                 >
                   <div className="aspect-[16/7] overflow-hidden bg-ink/5">
                     <img
@@ -128,12 +163,12 @@ export default function ChallengesPage() {
                       </p>
                     )}
                   </div>
-                </article>
+                </Link>
               );
             })}
             {challenges.length === 0 && (
               <p className="col-span-full border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
-                Tidak ada tantangan pada kategori ini.
+                Tidak ada tantangan yang cocok.
               </p>
             )}
           </div>
