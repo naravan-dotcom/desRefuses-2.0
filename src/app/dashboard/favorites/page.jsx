@@ -12,6 +12,7 @@ export default function DashboardFavoritesPage() {
   const [selectedCollectionIds, setSelectedCollectionIds] = useState(() => new Set());
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [addSelections, setAddSelections] = useState({});
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -58,6 +59,13 @@ export default function DashboardFavoritesPage() {
     const next = loadDb();
     const target = next.users.find((item) => item.id === user.id);
     if (!target) return;
+    const isDuplicate = (target.collections ?? []).some(
+      (item) => item.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (isDuplicate) {
+      setError("Nama koleksi sudah ada.");
+      return;
+    }
     target.collections = target.collections ?? [];
     target.collections.push({ id: uid("col"), name, artworkIds });
     saveDb(next);
@@ -77,6 +85,37 @@ export default function DashboardFavoritesPage() {
     saveDb(next);
     setDb(next);
     setNotice("Koleksi dihapus.");
+  }
+
+  function removeFromCollection(collectionId, artworkId) {
+    const next = loadDb();
+    const target = next.users.find((item) => item.id === user?.id);
+    if (!target) return;
+    const collection = (target.collections ?? []).find(
+      (item) => item.id === collectionId,
+    );
+    if (!collection) return;
+    collection.artworkIds = (collection.artworkIds ?? []).filter(
+      (item) => item !== artworkId,
+    );
+    saveDb(next);
+    setDb(next);
+    setNotice("Karya dikeluarkan dari koleksi.");
+  }
+
+  function addToCollection(collectionId, artworkId) {
+    const next = loadDb();
+    const target = next.users.find((item) => item.id === user?.id);
+    if (!target) return;
+    const collection = (target.collections ?? []).find(
+      (item) => item.id === collectionId,
+    );
+    if (!collection) return;
+    if ((collection.artworkIds ?? []).includes(artworkId)) return;
+    collection.artworkIds = [...(collection.artworkIds ?? []), artworkId];
+    saveDb(next);
+    setDb(next);
+    setNotice("Karya ditambahkan ke koleksi.");
   }
 
   return (
@@ -195,34 +234,70 @@ export default function DashboardFavoritesPage() {
                   Hapus
                 </button>
               </div>
-              {collection.artworkIds.length === 0 ? (
-                <p className="text-xs text-ink/45">Belum ada karya dalam koleksi.</p>
-              ) : (
+              {collection.artworkIds.length > 0 && (
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                   {collection.artworkIds.map((artworkId) => {
                     const artwork = db.artworks.find((item) => item.id === artworkId);
                     if (!artwork) return null;
                     return (
-                      <Link
-                        key={artworkId}
-                        href={`/artwork/${artwork.id}`}
-                        className="border border-ink/15 bg-white"
-                      >
-                        <img
-                          src={artwork.image}
-                          alt={artwork.title}
-                          loading="lazy"
-                          className="aspect-[4/3] w-full object-cover"
-                        />
-                        <div className="p-3">
-                          <p className="text-sm font-medium">{artwork.title}</p>
-                          <p className="mt-1 text-xs text-ink/50">
-                            {db.users.find((item) => item.id === artwork.userId)?.name ?? "Kreator"}
-                          </p>
-                        </div>
-                      </Link>
+                      <div key={artworkId} className="relative border border-ink/15 bg-white">
+                        <Link href={`/artwork/${artwork.id}`} className="block">
+                          <img
+                            src={artwork.image}
+                            alt={artwork.title}
+                            loading="lazy"
+                            className="aspect-[4/3] w-full object-cover"
+                          />
+                          <div className="p-3">
+                            <p className="text-sm font-medium">{artwork.title}</p>
+                            <p className="mt-1 text-xs text-ink/50">
+                              {db.users.find((item) => item.id === artwork.userId)?.name ?? "Kreator"}
+                            </p>
+                          </div>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => removeFromCollection(collection.id, artworkId)}
+                          className="absolute right-2 top-2 border border-ink/20 bg-white px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-ink/60 hover:text-ink"
+                        >
+                          Keluar
+                        </button>
+                      </div>
                     );
                   })}
+                </div>
+              )}
+              {favorites.some((item) => !collection.artworkIds.includes(item.id)) && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={addSelections[collection.id] ?? ""}
+                    onChange={(event) =>
+                      setAddSelections((current) => ({
+                        ...current,
+                        [collection.id]: event.target.value,
+                      }))
+                    }
+                    className="flex-1 border border-ink/20 bg-white px-3 py-2.5 text-sm"
+                  >
+                    <option value="">Tambah karya dari favorit...</option>
+                    {favorites
+                      .filter((item) => !collection.artworkIds.includes(item.id))
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.title}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const artworkId = addSelections[collection.id];
+                      if (artworkId) addToCollection(collection.id, artworkId);
+                    }}
+                    className="bg-ink px-3 py-2 text-xs font-medium text-paper"
+                  >
+                    Tambah
+                  </button>
                 </div>
               )}
             </div>
