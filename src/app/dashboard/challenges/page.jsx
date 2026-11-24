@@ -42,6 +42,8 @@ export default function DashboardChallengesPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmingId, setConfirmingId] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [winnerDraft, setWinnerDraft] = useState({ first: null, second: null, third: null });
 
   useEffect(() => {
     const timer = setTimeout(() => setDb(loadDb()), 0);
@@ -63,6 +65,41 @@ export default function DashboardChallengesPage() {
   const confirming = confirmingId
     ? challenges.find((item) => item.id === confirmingId) ?? null
     : null;
+
+  const selected = selectedId
+    ? challenges.find((item) => item.id === selectedId) ?? null
+    : null;
+
+  const selectedEntries = useMemo(() => {
+    if (!selected) return [];
+    return db.submissions
+      .filter((item) => item.challengeId === selected.id)
+      .map((submission) => ({
+        submission,
+        artwork: db.artworks.find((item) => item.id === submission.artworkId) ?? null,
+        submitter: db.users.find((item) => item.id === submission.userId) ?? null,
+      }))
+      .filter((entry) => entry.artwork);
+  }, [db, selected]);
+
+  const winnerOptions = useMemo(() => {
+    const entriesByArtwork = new Map();
+    selectedEntries.forEach((entry) => {
+      if (entry.artwork && !entriesByArtwork.has(entry.artwork.id)) {
+        entriesByArtwork.set(entry.artwork.id, entry);
+      }
+    });
+    return [...entriesByArtwork.values()];
+  }, [selectedEntries]);
+
+  const usedWinnerArtworkIds = useMemo(() => {
+    const used = new Set();
+    Object.keys(winnerDraft).forEach((key) => {
+      const artworkId = winnerDraft[key];
+      if (artworkId) used.add(artworkId);
+    });
+    return used;
+  }, [winnerDraft]);
 
   function resetForm() {
     setShowForm(false);
@@ -220,11 +257,61 @@ export default function DashboardChallengesPage() {
     setNotice("Tantangan berhasil dihapus beserta submisinya.");
   }
 
+  function openManage(id) {
+    setError("");
+    setNotice("");
+    setConfirmingId(null);
+    setSelectedId(id);
+    const target = db.challenges.find((item) => item.id === id);
+    setWinnerDraft({
+      first: target?.winners?.first ?? null,
+      second: target?.winners?.second ?? null,
+      third: target?.winners?.third ?? null,
+    });
+  }
+
+  function setWinner(key, artworkId) {
+    setWinnerDraft((current) => ({ ...current, [key]: artworkId }));
+  }
+
+  function saveWinners() {
+    if (!selected) return;
+    if (getStatus(selected) !== "ended") {
+      setError("Pemilihan pemenang hanya dibuka setelah tanggal selesai.");
+      return;
+    }
+    const assigned = [winnerDraft.first, winnerDraft.second, winnerDraft.third].filter(Boolean);
+    if (assigned.length !== new Set(assigned).size) {
+      setError("Satu karya hanya boleh dipilih untuk satu peringkat.");
+      return;
+    }
+    const next = loadDb();
+    const target = next.challenges.find((item) => item.id === selected.id);
+    if (!target) {
+      setError("Tantangan tidak ditemukan.");
+      return;
+    }
+    target.winners = {
+      first: winnerDraft.first,
+      second: winnerDraft.second,
+      third: winnerDraft.third,
+    };
+    saveDb(next);
+    setDb(next);
+    setNotice("Pemenang berhasil disimpan.");
+  }
+
   const statusLabels = {
     active: "Aktif",
     upcoming: "Mendatang",
     ended: "Selesai",
   };
+
+  const winnerRanks = [
+    { key: "first", label: "Juara 1" },
+    { key: "second", label: "Juara 2" },
+    { key: "third", label: "Juara 3" },
+  ];
 
   return (
     <>
@@ -450,6 +537,13 @@ export default function DashboardChallengesPage() {
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
+                            onClick={() => openManage(challenge.id)}
+                            className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
+                          >
+                            Submisi
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => startEdit(challenge)}
                             className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
                           >
@@ -476,6 +570,131 @@ export default function DashboardChallengesPage() {
           </table>
         </div>
       </div>
+
+      {selected && (
+        <section className="space-y-5 border border-ink/15 bg-white p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+                Kurator
+              </p>
+              <h2 className="text-xl font-semibold">Kelola submisi</h2>
+              <p className="text-sm text-ink/55">{selected.title}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="border border-ink/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-ink/60">
+                {statusLabels[getStatus(selected)]}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+              Galeri partisipan
+            </p>
+            {selectedEntries.length === 0 ? (
+              <p className="border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
+                Belum ada karya yang disubmit.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {selectedEntries.map((entry) => (
+                  <article key={entry.submission.id} className="border border-ink/15 bg-white">
+                    <div className="aspect-[4/5] overflow-hidden bg-ink/5">
+                      <img
+                        src={entry.artwork.image}
+                        alt={entry.artwork.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="p-3">
+                      <h3 className="text-sm font-medium leading-snug">
+                        {entry.artwork.title}
+                      </h3>
+                      <p className="mt-1 text-xs text-ink/55">
+                        {entry.submitter?.name ?? "Kreator"}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {getStatus(selected) === "ended" ? (
+            <div className="space-y-4 border-t border-ink/10 pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+                    Pemenang
+                  </p>
+                  <h3 className="mt-1 text-xl font-semibold">Pilih pemenang</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={saveWinners}
+                  className="bg-ink px-4 py-2.5 text-xs font-medium text-paper transition-colors hover:bg-brand"
+                >
+                  Simpan pemenang
+                </button>
+              </div>
+              <p className="text-xs text-ink/50">
+                Challenge sudah berakhir. Pilih maksimal tiga karya sebagai pemenang.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {winnerRanks.map((rank) => {
+                  const assignedArtworkId = winnerDraft[rank.key];
+                  const options = winnerOptions
+                    .filter(
+                      (entry) =>
+                        entry.artwork &&
+                        (assignedArtworkId === entry.artwork.id ||
+                          !usedWinnerArtworkIds.has(entry.artwork.id)),
+                    )
+                    .map((entry) => ({
+                      artworkId: entry.artwork.id,
+                      title: entry.artwork.title,
+                    }));
+
+                  return (
+                    <label key={rank.key} className="block space-y-2 text-xs text-ink/60">
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-ink/45">
+                        {rank.label}
+                      </span>
+                      <select
+                        value={assignedArtworkId ?? ""}
+                        onChange={(event) =>
+                          setWinner(rank.key, event.target.value || null)
+                        }
+                        className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none focus:border-ink"
+                      >
+                        <option value="">Belum dipilih</option>
+                        {options.map((option) => (
+                          <option key={option.artworkId} value={option.artworkId}>
+                            {option.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="border border-dashed border-ink/20 p-4 text-xs text-ink/55">
+              Pemilihan pemenang dibuka setelah tanggal selesai.
+            </p>
+          )}
+        </section>
+      )}
     </>
   );
 }
