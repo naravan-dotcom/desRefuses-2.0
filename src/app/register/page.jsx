@@ -7,8 +7,7 @@ import { useState } from "react";
 import AuthShell from "@/components/auth-shell";
 import { notify } from "@/components/toast";
 import { homeForUser } from "@/lib/access";
-import { isoNow, loadDb, saveDb } from "@/lib/local-data";
-import { IMAGES } from "@/lib/seed";
+
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -71,25 +70,6 @@ export default function RegisterPage() {
         fail(data.error ?? "Pendaftaran gagal.");
         return;
       }
-
-      const created = data.user;
-      const db = loadDb();
-      db.users.push({
-        id: created.id,
-        role: created.role,
-        status: created.status,
-        name: created.name,
-        username: created.username,
-        email: created.email,
-        password: "",
-        avatar: created.avatar || IMAGES.av6,
-        bio: "",
-        links: { instagram: "", behance: "", website: "" },
-        favorites: [],
-        following: [],
-        joinedAt: isoNow(),
-      });
-      saveDb(db);
 
       const result = await signIn("credentials", {
         email: cleanEmail,
