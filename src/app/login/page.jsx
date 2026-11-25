@@ -7,15 +7,6 @@ import AuthShell from "@/components/auth/auth-shell";
 import { notify } from "@/components/ui/toast";
 import { homeForUser } from "@/lib/access";
 
-const demoAccounts = [
-  { role: "Member", name: "Sora Vane", email: "sora@desrefuses.id", password: "member123" },
-  { role: "Member ditangguhkan", name: "Balthazar K.", email: "balthazar@desrefuses.id", password: "member123" },
-  { role: "Admin", name: "Nadia Pratama", email: "admin@desrefuses.id", password: "admin123" },
-  { role: "Curator approved", name: "Musée Libre Paris", email: "musee@desrefuses.id", password: "curator123" },
-  { role: "Curator pending", name: "DAO Hectic Arts", email: "dao@desrefuses.id", password: "curator123" },
-  { role: "Curator rejected", name: "Studio Nol", email: "nol@desrefuses.id", password: "curator123" },
-];
-
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -33,7 +24,7 @@ export default function LoginPage() {
         redirect: false,
       });
       if (result?.error || !result?.ok) {
-        const msg = "Email atau password tidak cocok. Coba akun demo di bawah.";
+        const msg = "Email atau password tidak cocok.";
         setError(msg);
         notify(msg, "error");
         return;
@@ -49,19 +40,13 @@ export default function LoginPage() {
     }
   }
 
-  function fillDemo(demoEmail, demoPassword) {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setError("");
-  }
-
   return (
     <AuthShell mode="login">
       <h1 className="font-display text-[34px] leading-[1.12] tracking-[-0.01em] lg:text-[40px]">
         Masuk ke<br />ruang yang terbuka.
       </h1>
       <p className="mt-5 text-[14px] leading-[1.7] text-ink/65">
-        Gunakan akun Anda, atau pilih salah satu akun demo untuk mencoba peran yang berbeda.
+        Masuk menggunakan email dan password akun Anda.
       </p>
       <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
         <div>
@@ -97,28 +82,6 @@ export default function LoginPage() {
         )}
         <button type="submit" className="btn btn-ink w-full">Masuk</button>
       </form>
-
-      <details className="mt-8 border-t hairline pt-5" open>
-        <summary className="flex cursor-pointer list-none items-center justify-between">
-          <span className="label text-ink/65">Akun demo</span>
-        </summary>
-        <div className="mt-1 grid gap-x-8 sm:grid-cols-2">
-          {demoAccounts.map((account) => (
-            <button
-              key={account.email}
-              type="button"
-              onClick={() => fillDemo(account.email, account.password)}
-              className="border-b hairline py-2.5 text-left transition-colors hover:text-wine"
-            >
-              <div className="text-[13px] font-semibold">{account.name}</div>
-              <div className="label mt-1 text-ink/65">{account.role}</div>
-            </button>
-          ))}
-        </div>
-        <p className="font-label mt-3 text-[12px] uppercase tracking-normal text-ink/65">
-          Klik akun untuk mengisi kredensial, lalu tekan Masuk.
-        </p>
-      </details>
     </AuthShell>
   );
 }
