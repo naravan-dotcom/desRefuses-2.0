@@ -378,7 +378,7 @@ export default function ChallengeDetailPage() {
                       key={entry.id}
                       artwork={entry.artwork}
                       creator={entry.submitter?.name}
-                      creatorId={entry.submitter?.id}
+                      creatorId={String(entry.submitter?.id ?? "").replace(/^u/, "")}
                       category={categoryNames[entry.artwork.categoryId]}
                       commentCount={commentCounts[entry.artwork.id] ?? 0}
                       index={index}
@@ -437,7 +437,7 @@ export default function ChallengeDetailPage() {
                 <div className="mt-2">{participation}</div>
                 {notice && <p className="label mt-4 text-wine">{notice}</p>}
               </div>
-              <Link href={`/creator/${challenge.curatorId}`} className="block border hairline bg-white p-4 transition-colors hover:border-ink">
+              <Link href={`/creator/${String(challenge.curatorId).replace(/^u/, "")}`} className="block border hairline bg-white p-4 transition-colors hover:border-ink">
                 <div className="label text-ink/65">Diselenggarakan oleh</div>
                 <div className="mt-2 flex items-center gap-2.5">
                   {curator?.avatar ? (

@@ -294,7 +294,7 @@ export default function DashboardProfilePage() {
                   <p className="text-[14px] font-semibold">{followed.name}</p>
                   <p className="label mt-1 text-ink/55">@{followed.username}</p>
                 </div>
-                <Link href={`/creator/${followed.id}`} className="btn btn-outline btn-sm">
+                <Link href={`/creator/${followed.dbId ?? String(followed.id).replace(/^u/, "")}`} className="btn btn-outline btn-sm">
                   Lihat profil
                 </Link>
               </div>

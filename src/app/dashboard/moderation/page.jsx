@@ -1,165 +1,94 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import ConfirmDialog from "@/components/confirm-dialog";
-import { loadDb, saveDb } from "@/lib/local-data";
-import { createSeedDb } from "@/lib/seed";
+import Modal from "@/components/modal";
+import { notify } from "@/components/toast";
+import { dismissReport, listModerationGroups, takeDown } from "./actions";
 
-const FILTERS = ["Semua", "Karya", "Komentar"];
-const TYPE_BY_FILTER = { Karya: "artwork", Komentar: "comment" };
+function artCode(id) {
+  const digits = String(id ?? "").replace(/\D/g, "");
+  return digits ? `No. ${digits.padStart(2, "0")}` : `#${id}`;
+}
 
-function formatDate(value) {
+function timeId(value) {
   if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function buildForm(type, targetId) {
+  const formData = new FormData();
+  formData.set("type", type);
+  formData.set("targetId", String(targetId));
+  return formData;
 }
 
 export default function DashboardModerationPage() {
-  const [db, setDb] = useState(() => createSeedDb());
-  const [activeFilter, setActiveFilter] = useState("Semua");
-  const [notice, setNotice] = useState("");
-  const [confirmGroup, setConfirmGroup] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const [activeGroup, setActiveGroup] = useState(null);
+  const [takedownGroup, setTakedownGroup] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function refresh() {
+    const result = await listModerationGroups();
+    if (!result.ok) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+    setGroups(result.groups);
+    setError("");
+    setLoading(false);
+  }
 
   useEffect(() => {
-    const timer = setTimeout(() => setDb(loadDb()), 0);
-    return () => clearTimeout(timer);
+    void Promise.resolve().then(refresh);
   }, []);
 
-  const allOpenGroups = useMemo(() => {
-    const map = new Map();
-    db.reports
-      .filter((item) => item.status === "open")
-      .forEach((item) => {
-        const key = `${item.type}:${item.targetId}`;
-        if (!map.has(key)) {
-          map.set(key, {
-            key,
-            type: item.type,
-            targetId: item.targetId,
-            reports: [],
-          });
-        }
-        map.get(key).reports.push(item);
-      });
-    return Array.from(map.values());
-  }, [db]);
+  useEffect(() => {
+    if (error) notify(error, "error");
+  }, [error]);
 
-  const artworkReportCount = allOpenGroups.filter((g) => g.type === "artwork").length;
-  const commentReportCount = allOpenGroups.filter((g) => g.type === "comment").length;
+  const artworkCount = groups.filter((group) => group.type === "artwork").length;
+  const commentCount = groups.filter((group) => group.type === "comment").length;
+  const reportCount = groups.reduce((sum, group) => sum + group.reports.length, 0);
+  const visibleGroups = groups.filter((group) => filter === "all" || group.type === filter);
+  const mostReported = [...groups].sort((a, b) => b.reports.length - a.reports.length)[0];
 
-  const groups = useMemo(() => {
-    return allOpenGroups
-      .filter((group) => {
-        const type = TYPE_BY_FILTER[activeFilter];
-        return !type || group.type === type;
-      })
-      .map((group) => {
-        const artwork =
-          group.type === "artwork"
-            ? db.artworks.find((item) => item.id === group.targetId) ?? null
-            : null;
-        const comment =
-          group.type === "comment"
-            ? db.comments.find((item) => item.id === group.targetId) ?? null
-            : null;
-        const parentArtwork = comment
-          ? db.artworks.find((item) => item.id === comment.artworkId) ?? null
-          : null;
-        const authorId = artwork?.userId ?? comment?.userId;
-        const author = db.users.find((item) => item.id === authorId);
-        const category = artwork
-          ? db.categories.find((c) => c.id === artwork.categoryId)
-          : null;
-
-        return {
-          ...group,
-          artwork,
-          comment,
-          parentArtwork,
-          author,
-          category,
-          href: artwork ? `/artwork/${artwork.id}` : parentArtwork ? `/artwork/${parentArtwork.id}` : null,
-        };
-      });
-  }, [allOpenGroups, db, activeFilter]);
-
-  function dismiss(group) {
-    const next = loadDb();
-    next.reports.forEach((item) => {
-      if (
-        item.type === group.type &&
-        item.targetId === group.targetId &&
-        item.status === "open"
-      ) {
-        item.status = "dismissed";
-      }
-    });
-    saveDb(next);
-    setDb(next);
-    setConfirmGroup(null);
-    setNotice("Laporan diabaikan. Member dapat melapor ulang jika perlu.");
-  }
-
-  function takeDown(group) {
-    const next = loadDb();
-    const matching = (item) =>
-      item.type === group.type && item.targetId === group.targetId;
-
-    if (group.type === "artwork") {
-      const removedComments = next.comments
-        .filter((item) => item.artworkId === group.targetId)
-        .map((item) => item.id);
-
-      next.comments = next.comments.filter(
-        (item) => item.artworkId !== group.targetId,
-      );
-      next.artworks = next.artworks.filter(
-        (item) => item.id !== group.targetId,
-      );
-      next.submissions = next.submissions.filter(
-        (item) => item.artworkId !== group.targetId,
-      );
-      next.challenges.forEach((challenge) => {
-        ["first", "second", "third"].forEach((rank) => {
-          if (challenge.winners?.[rank] === group.targetId) {
-            challenge.winners[rank] = null;
-          }
-        });
-      });
-      next.users.forEach((item) => {
-        item.favorites = (item.favorites ?? []).filter(
-          (id) => id !== group.targetId,
-        );
-      });
-      next.reports.forEach((item) => {
-        if (
-          matching(item) ||
-          (item.type === "comment" && removedComments.includes(item.targetId))
-        ) {
-          item.status = "resolved";
-        }
-      });
-    } else {
-      next.comments = next.comments.filter(
-        (item) => item.id !== group.targetId,
-      );
-      next.reports.forEach((item) => {
-        if (matching(item)) item.status = "resolved";
-      });
+  async function dismiss(group) {
+    const result = await dismissReport(buildForm(group.type, group.targetId));
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
-
-    saveDb(next);
-    setDb(next);
-    setConfirmGroup(null);
-    setNotice("Konten dihapus dan laporan ditandai selesai.");
+    setActiveGroup(null);
+    notify("Laporan diabaikan.", "success");
+    await refresh();
   }
 
-  function countLabel(filter) {
-    if (filter === "Karya") return `Laporan karya (${artworkReportCount})`;
-    if (filter === "Komentar") return `Laporan komentar (${commentReportCount})`;
-    return `Semua (${allOpenGroups.length})`;
+  async function takeDownGroup() {
+    const group = takedownGroup;
+    if (!group) return;
+    setTakedownGroup(null);
+    setActiveGroup(null);
+    const result = await takeDown(buildForm(group.type, group.targetId));
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    notify("Konten berhasil dihapus.", "success");
+    await refresh();
   }
 
   return (
@@ -168,177 +97,221 @@ export default function DashboardModerationPage() {
         <p className="label text-wine">Panel admin</p>
         <h1 className="font-display mt-2 text-3xl lg:text-4xl">Moderasi</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-ink/65">
-          Tinjau laporan karya dan komentar dari komunitas.
+          Tinjau laporan komunitas dan ambil tindakan berdasarkan etika, bukan selera.
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-6 border-b hairline">
-        {FILTERS.map((item) => (
-          <button
-            type="button"
-            key={item}
-            onClick={() => {
-              setActiveFilter(item);
-              setNotice("");
-            }}
-            className={`chip ${item === activeFilter ? "active" : ""}`}
-          >
-            {countLabel(item)}
-          </button>
-        ))}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="border hairline bg-white p-5">
+          <div className="label text-ink/65">Laporan masuk</div>
+          <p className="font-display mt-2 text-[34px] leading-none">{reportCount}</p>
+          <div className="mt-2 text-[13px] text-ink/60">dari {groups.length} konten</div>
+        </div>
+        <div className="border hairline bg-white p-5">
+          <div className="label text-ink/65">Karya dilaporkan</div>
+          <p className="font-display mt-2 text-[34px] leading-none text-wine">{artworkCount}</p>
+          <div className="mt-2 text-[13px] text-ink/60">menunggu tinjauan</div>
+        </div>
+        <div className="border hairline bg-white p-5">
+          <div className="label text-ink/65">Komentar dilaporkan</div>
+          <p className="font-display mt-2 text-[34px] leading-none">{commentCount}</p>
+          <div className="mt-2 text-[13px] text-ink/60">menunggu tinjauan</div>
+        </div>
       </div>
 
-      {notice && (
-        <p className="border-l-2 border-ink bg-white px-4 py-3 text-[13px] text-ink/75">
-          {notice}
-        </p>
-      )}
+      <div className="grid gap-8 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b hairline pb-4">
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["all", "Semua"],
+                ["artwork", "Karya"],
+                ["comment", "Komentar"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  className={`chip ${filter === value ? "active" : ""}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className="label text-ink/55">{visibleGroups.length} antrean</span>
+          </div>
 
-      {groups.length === 0 ? (
-        <div className="border-t border-b hairline px-6 py-12 text-center">
-          <i className="fa-solid fa-shield-halved text-2xl text-ink/35" />
-          <h3 className="font-display mt-3 text-xl font-bold">Antrean moderasi kosong</h3>
-          <p className="mt-1 text-[14px] text-ink/60">Tidak ada laporan terbuka pada filter ini.</p>
+          {loading ? (
+            <div className="mt-5 border border-dashed border-ink/20 p-10 text-center text-[14px] text-ink/55">
+              Memuat antrean moderasi...
+            </div>
+          ) : visibleGroups.length ? (
+            <div className="mt-5 space-y-3">
+              {visibleGroups.map((group) => {
+                const preview = group.artwork ?? group.parentArtwork;
+                return (
+                  <button
+                    key={group.key}
+                    type="button"
+                    onClick={() => setActiveGroup(group)}
+                    className="flex w-full items-center gap-4 border hairline bg-white p-3 text-left transition-colors hover:bg-canvas"
+                  >
+                    <img src={preview?.image} alt="" className="h-16 w-20 shrink-0 object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="status status-pending">{group.type === "artwork" ? "Karya" : "Komentar"}</span>
+                        <span className="label text-ink/45">{artCode(group.targetId)}</span>
+                      </div>
+                      <h3 className="font-display mt-2 truncate text-[20px] leading-tight">
+                        {group.artwork?.title ?? (group.comment ? `Komentar oleh ${group.author?.name ?? "Member"}` : "Konten tidak ditemukan")}
+                      </h3>
+                      <p className="mt-1 truncate text-[13px] text-ink/60">
+                        {group.comment?.text ?? group.artwork?.description ?? "—"}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-display text-[26px] leading-none text-wine">{group.reports.length}</div>
+                      <div className="label mt-1 text-ink/55">laporan</div>
+                    </div>
+                    <i className="fa-solid fa-chevron-right text-[12px] text-ink/40" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-5 border border-dashed border-ink/20 p-10 text-center">
+              <i className="fa-regular fa-circle-check text-2xl text-ink/40" />
+              <h3 className="font-display mt-4 text-[24px]">Antrean bersih</h3>
+              <p className="mt-2 text-sm text-ink/60">Belum ada laporan yang perlu ditinjau.</p>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="space-y-4">
-          {groups.map((group) => (
-            <div key={group.key} className="border hairline bg-white">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b hairline px-5 py-3.5">
-                <div className="flex items-center gap-3">
-                  <span className="status status-pending">
-                    {group.reports.length} laporan terbuka
-                  </span>
-                  <span className="label text-ink/60">
-                    {group.type === "artwork" ? "Karya" : "Komentar"}
-                  </span>
+
+        <aside className="lg:col-span-4">
+          <div className="border hairline bg-white p-5">
+            <p className="label text-ink/65">Paling banyak dilaporkan</p>
+            {mostReported ? (
+              <>
+                <img
+                  src={mostReported.artwork?.image ?? mostReported.parentArtwork?.image}
+                  alt=""
+                  className="art-media mt-4 aspect-[4/3] w-full object-cover"
+                />
+                <h3 className="font-display mt-4 text-[22px] leading-tight">
+                  {mostReported.artwork?.title ?? "Komentar dilaporkan"}
+                </h3>
+                <div className="mt-3 flex items-center justify-between border-t hairline pt-3 text-[13px] text-ink/65">
+                  <span>{mostReported.reports.length} laporan</span>
+                  <span>{mostReported.author?.name ?? "Kreator"}</span>
                 </div>
-                {group.href && (
-                  <Link href={group.href} className="btn btn-outline btn-sm">
-                    Buka karya <i className="fa-solid fa-arrow-up-right-from-square text-[11px]" />
+                <button
+                  type="button"
+                  onClick={() => setActiveGroup(mostReported)}
+                  className="btn btn-outline btn-sm mt-5 w-full"
+                >
+                  Tinjau sekarang
+                </button>
+              </>
+            ) : (
+              <p className="mt-4 text-[14px] text-ink/55">Belum ada laporan masuk.</p>
+            )}
+          </div>
+          <div className="border-t hairline mt-6 pt-4 text-[12px] leading-relaxed text-ink/55">
+            Tindakan moderasi bersifat permanen. Abaikan laporan jika konten tidak melanggar etika komunitas.
+          </div>
+        </aside>
+      </div>
+
+      <Modal
+        open={Boolean(activeGroup)}
+        onClose={() => setActiveGroup(null)}
+        title={activeGroup?.type === "comment" ? "Tinjau komentar" : "Tinjau karya"}
+        subtitle="Panel admin"
+        maxWidth="max-w-3xl"
+      >
+        {activeGroup && (
+          <>
+            <p className="text-[14px] leading-relaxed text-ink/65">
+              {activeGroup.reports.length} laporan masuk untuk {activeGroup.type === "artwork" ? "karya" : "komentar"} ini.
+            </p>
+            <div className="mt-5 grid gap-6 sm:grid-cols-12">
+            <div className="sm:col-span-5">
+              <img
+                src={activeGroup.artwork?.image ?? activeGroup.parentArtwork?.image}
+                alt=""
+                className="art-media aspect-[4/5] w-full object-cover"
+              />
+            </div>
+            <div className="sm:col-span-7">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="status status-pending">{activeGroup.type === "artwork" ? "Karya" : "Komentar"}</span>
+                <span className="label text-ink/45">{artCode(activeGroup.targetId)}</span>
+              </div>
+              <h3 className="font-display mt-3 text-[26px] leading-tight">
+                {activeGroup.artwork?.title ?? `Komentar oleh ${activeGroup.author?.name ?? "Member"}`}
+              </h3>
+              <p className="mt-2 text-[14px] leading-relaxed text-ink/70">
+                {activeGroup.artwork
+                  ? activeGroup.artwork.description
+                  : activeGroup.comment?.text ?? "Komentar tidak ditemukan."}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-ink/60">
+                <span>Oleh <span className="font-medium text-ink">{activeGroup.author?.name ?? "Kreator"}</span></span>
+                {activeGroup.category && <span>· {activeGroup.category.name}</span>}
+                {activeGroup.href && (
+                  <Link href={activeGroup.href} target="_blank" className="label inline-flex items-center gap-2 text-wine hover:underline">
+                    Lihat konten <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
                   </Link>
                 )}
               </div>
-
-              <div className="grid gap-6 p-5 lg:grid-cols-2">
-                <div>
-                  {group.type === "artwork" && group.artwork ? (
-                    <div className="flex gap-4">
-                      <img
-                        src={group.artwork.image}
-                        alt={group.artwork.title}
-                        className="h-28 w-24 shrink-0 border hairline object-cover"
-                      />
-                      <div className="min-w-0">
-                        <h3 className="font-display text-xl leading-tight">
-                          {group.artwork.title}
-                        </h3>
-                        <p className="mt-1 text-[12px] text-ink/60">
-                          {group.author?.name ?? "Kreator"}
-                          {group.category ? ` · ${group.category.name}` : ""}
-                        </p>
-                        <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-ink/70">
-                          {group.artwork.description}
-                        </p>
-                        <p className="mt-2 text-[11px] font-label text-ink/50">
-                          Diunggah {formatDate(group.artwork.createdAt)}
-                        </p>
+              <div className="mt-6 border-t hairline pt-4">
+                <div className="label text-ink/65">Alasan laporan</div>
+                <div className="mt-3 space-y-3">
+                  {activeGroup.reports.map((report) => (
+                    <div key={report.id} className="border-l-2 border-wine bg-wine/5 px-3 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-[13px]">{report.reason}</span>
+                        <span className="label text-ink/50">{timeId(report.createdAt)}</span>
                       </div>
+                      {report.detail && <p className="mt-1 text-[13px] leading-relaxed text-ink/65">{report.detail}</p>}
+                      <p className="label mt-1 text-ink/45">oleh {report.reporterName}</p>
                     </div>
-                  ) : (
-                    <div className="border hairline bg-paper p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-medium">
-                          {group.author?.name ?? "Pengguna"}
-                        </span>
-                        <span className="text-[11px] font-label text-ink/50">
-                          {formatDate(group.comment?.createdAt)}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-[14px] leading-relaxed text-ink/80">
-                        {group.comment ? `"${group.comment.text}"` : "Komentar tidak ditemukan"}
-                      </p>
-                      {group.parentArtwork && (
-                        <p className="mt-2 text-[12px] text-ink/55">
-                          Pada karya: {group.parentArtwork.title}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <p className="label text-ink/60">Detail laporan</p>
-                  <div className="mt-2.5 max-h-40 space-y-2 overflow-y-auto pr-1">
-                    {group.reports.map((report) => {
-                      const reporter = db.users.find((u) => u.id === report.reporterId);
-                      return (
-                        <div key={report.id} className="border hairline bg-canvas/50 p-3 text-[13px]">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-label text-[11px] uppercase tracking-wider text-wine">
-                              {report.reason}
-                            </span>
-                            <span className="text-[11px] text-ink/50">
-                              {formatDate(report.createdAt)}
-                            </span>
-                          </div>
-                          {report.detail && (
-                            <p className="mt-1 text-ink/75">{report.detail}</p>
-                          )}
-                          <p className="mt-1 text-[11px] text-ink/50">
-                            Pelapor: {reporter?.name ?? "Member"}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  ))}
                 </div>
               </div>
-
-              <div className="flex flex-wrap justify-end gap-2 border-t hairline px-5 py-3.5">
+              <div className="mt-6 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => dismiss(group)}
+                  onClick={() => setTakedownGroup(activeGroup)}
+                  className="btn btn-ink btn-sm"
+                >
+                  Hapus konten
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dismiss(activeGroup)}
                   className="btn btn-outline btn-sm"
                 >
-                  Dismiss report
+                  Abaikan laporan
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmGroup(group)}
-                  className="btn btn-pink btn-sm"
-                >
-                  Take down
-                </button>
+                <Link href={activeGroup.href ?? "#"} className="btn btn-outline btn-sm">
+                  Buka karya
+                </Link>
               </div>
             </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-start gap-3 border hairline bg-canvas/60 p-4 text-[13px] text-ink/70">
-        <i className="fa-solid fa-scale-balanced mt-0.5 text-wine" />
-        <p>
-          Moderasi hanya menindak pelanggaran serius (SARA, plagiat, atau konten tidak pantas) — bukan penilaian estetika karya.
-        </p>
-      </div>
+            </div>
+          </>
+        )}
+      </Modal>
 
       <ConfirmDialog
-        open={Boolean(confirmGroup)}
-        onClose={() => setConfirmGroup(null)}
-        onConfirm={() => takeDown(confirmGroup)}
+        open={Boolean(takedownGroup)}
+        onClose={() => setTakedownGroup(null)}
+        onConfirm={takeDownGroup}
         title="Hapus konten"
-        subtitle="Moderasi"
-        message={
-          <>
-            Take down{" "}
-            <span className="font-semibold">
-              {confirmGroup?.artwork?.title ?? "komentar ini"}
-            </span>
-            ? Konten akan dihapus permanen dan laporan ditandai selesai.
-          </>
-        }
-        confirmLabel="Ya, take down"
+        subtitle="Panel admin"
+        message="Konten akan dihapus permanen beserta data terkait. Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Ya, hapus"
         danger
       />
     </>

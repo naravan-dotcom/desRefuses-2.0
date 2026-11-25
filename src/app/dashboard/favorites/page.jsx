@@ -2,317 +2,324 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import ArtworkCard from "@/components/artwork-card";
+import ConfirmDialog from "@/components/confirm-dialog";
+import Modal from "@/components/modal";
 import { notify } from "@/components/toast";
 import { loadDb, saveDb, uid } from "@/lib/local-data";
-import { getSessionId } from "@/lib/auth-client";
-import { createSeedDb } from "@/lib/seed";
+import { useSession } from "@/lib/use-session";
+import { listFavorites } from "./actions";
+
+function artCode(id) {
+  const digits = String(id ?? "").replace(/\D/g, "");
+  return digits ? `No. ${digits.padStart(2, "0")}` : `#${id}`;
+}
+
+function collectionHas(collection, artwork) {
+  const id = String(artwork.id);
+  return (collection?.artworkIds ?? []).some((value) => {
+    const raw = String(value);
+    return raw === id || raw === `a${id}` || raw.replace(/\D/g, "") === id;
+  });
+}
 
 export default function DashboardFavoritesPage() {
-  const [db, setDb] = useState(() => createSeedDb());
-  const [sessionId, setSessionIdState] = useState(null);
-  const [newCollectionName, setNewCollectionName] = useState("");
-  const [selectedCollectionIds, setSelectedCollectionIds] = useState(() => new Set());
+  const { user } = useSession();
+  const [favoriteArtworks, setFavoriteArtworks] = useState([]);
+  const [creators, setCreators] = useState({});
+  const [collections, setCollections] = useState([]);
+  const [selectedCollection, setSelectedCollection] = useState("all");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [addSelections, setAddSelections] = useState({});
+  const [showAddTo, setShowAddTo] = useState(null);
+  const [showNew, setShowNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [showRemove, setShowRemove] = useState(null);
+  const [deletingCollection, setDeletingCollection] = useState(null);
+
+  async function refreshFavorites() {
+    const result = await listFavorites();
+    if (!result.ok) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+    setFavoriteArtworks(result.artworks);
+    setCreators(result.creators);
+    setError("");
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      refreshFavorites();
+      const db = loadDb();
+      setCollections(db.collections ?? []);
+    });
+  }, []);
 
   useEffect(() => {
     if (error) notify(error, "error");
   }, [error]);
 
-  useEffect(() => {
-    if (notice) notify(notice, "success");
-  }, [notice]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDb(loadDb());
-      setSessionIdState(getSessionId());
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const user = useMemo(
-    () => (sessionId ? db.users.find((item) => item.id === sessionId) ?? null : null),
-    [db, sessionId],
-  );
-
-  const favorites = useMemo(() => {
-    if (!user) return [];
-    return (user.favorites ?? [])
-      .map((id) => db.artworks.find((item) => item.id === id))
-      .filter(Boolean);
-  }, [db, user]);
-
-  const collections = user?.collections ?? [];
-
-  function toggleCollectionSelection(artworkId) {
-    setSelectedCollectionIds((current) => {
-      const next = new Set(current);
-      if (next.has(artworkId)) next.delete(artworkId);
-      else next.add(artworkId);
-      return next;
-    });
+  function persistCollections(next) {
+    const db = loadDb();
+    const updated = { ...db, collections: next };
+    if (saveDb(updated)) {
+      setCollections(next);
+      return true;
+    }
+    notify("Gagal menyimpan koleksi di perangkat.", "error");
+    return false;
   }
 
-  function createCollection(event) {
+  function addCollection(event) {
     event.preventDefault();
-    const name = newCollectionName.trim();
-    if (!user) return;
-    if (!name) {
-      setError("Nama koleksi wajib diisi.");
-      return;
+    const name = newName.trim();
+    if (!name) return;
+    const next = [
+      ...collections,
+      { id: uid("col"), name, description: "", artworkIds: [], createdAt: new Date().toISOString() },
+    ];
+    if (persistCollections(next)) {
+      setNewName("");
+      setShowNew(false);
+      notify("Koleksi berhasil dibuat.", "success");
     }
-    const artworkIds = favorites
-      .filter((item) => selectedCollectionIds.has(item.id))
-      .map((item) => item.id);
-    const next = loadDb();
-    const target = next.users.find((item) => item.id === user.id);
-    if (!target) return;
-    const isDuplicate = (target.collections ?? []).some(
-      (item) => item.name.toLowerCase() === name.toLowerCase(),
-    );
-    if (isDuplicate) {
-      setError("Nama koleksi sudah ada.");
-      return;
+  }
+
+  function addToCollection(collectionId) {
+    const artwork = showAddTo;
+    if (!artwork) return;
+    const next = collections.map((collection) => {
+      if (collection.id !== collectionId || collectionHas(collection, artwork)) return collection;
+      return { ...collection, artworkIds: [...(collection.artworkIds ?? []), `a${artwork.id}`] };
+    });
+    if (persistCollections(next)) {
+      setShowAddTo(null);
+      notify("Karya ditambahkan ke koleksi.", "success");
     }
-    target.collections = target.collections ?? [];
-    target.collections.push({ id: uid("col"), name, artworkIds });
-    saveDb(next);
-    setDb(next);
-    setNewCollectionName("");
-    setSelectedCollectionIds(new Set());
-    setNotice("Koleksi berhasil dibuat.");
   }
 
-  function deleteCollection(id) {
-    const next = loadDb();
-    const target = next.users.find((item) => item.id === user?.id);
-    if (!target) return;
-    target.collections = (target.collections ?? []).filter(
-      (item) => item.id !== id,
-    );
-    saveDb(next);
-    setDb(next);
-    setNotice("Koleksi dihapus.");
+  function removeFromCollection() {
+    const artwork = showRemove;
+    if (!artwork) return;
+    const next = collections.map((collection) => {
+      if (collection.id !== selectedCollection) return collection;
+      return {
+        ...collection,
+        artworkIds: (collection.artworkIds ?? []).filter((value) => {
+          const raw = String(value);
+          return raw !== String(artwork.id) && raw !== `a${artwork.id}` && raw.replace(/\D/g, "") !== String(artwork.id);
+        }),
+      };
+    });
+    if (persistCollections(next)) {
+      setShowRemove(null);
+      notify("Karya dikeluarkan dari koleksi.", "success");
+    }
   }
 
-  function removeFromCollection(collectionId, artworkId) {
-    const next = loadDb();
-    const target = next.users.find((item) => item.id === user?.id);
-    if (!target) return;
-    const collection = (target.collections ?? []).find(
-      (item) => item.id === collectionId,
-    );
-    if (!collection) return;
-    collection.artworkIds = (collection.artworkIds ?? []).filter(
-      (item) => item !== artworkId,
-    );
-    saveDb(next);
-    setDb(next);
-    setNotice("Karya dikeluarkan dari koleksi.");
+  function deleteCollection() {
+    const id = deletingCollection;
+    if (!id) return;
+    const next = collections.filter((collection) => collection.id !== id);
+    if (persistCollections(next)) {
+      if (selectedCollection === id) setSelectedCollection("all");
+      setDeletingCollection(null);
+      notify("Koleksi berhasil dihapus.", "success");
+    }
   }
 
-  function addToCollection(collectionId, artworkId) {
-    const next = loadDb();
-    const target = next.users.find((item) => item.id === user?.id);
-    if (!target) return;
-    const collection = (target.collections ?? []).find(
-      (item) => item.id === collectionId,
-    );
-    if (!collection) return;
-    if ((collection.artworkIds ?? []).includes(artworkId)) return;
-    collection.artworkIds = [...(collection.artworkIds ?? []), artworkId];
-    saveDb(next);
-    setDb(next);
-    setNotice("Karya ditambahkan ke koleksi.");
-  }
+  const activeCollection = collections.find((collection) => collection.id === selectedCollection);
+  const visibleArtworks = useMemo(() => {
+    if (!activeCollection) return favoriteArtworks;
+    return favoriteArtworks.filter((artwork) => collectionHas(activeCollection, artwork));
+  }, [favoriteArtworks, activeCollection]);
 
   return (
     <>
-      <header className="border-b hairline pb-7">
-        <div className="label flex items-center gap-3 text-wine">
-          <span className="h-px w-8 bg-wine" />
-          Member
-        </div>
-        <h1 className="font-display mt-5 text-[38px] leading-none sm:text-[48px]">Favorit.</h1>
-        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/65">
-          Karya yang Anda simpan dari galeri, dikumpulkan di satu tempat.
+      <header className="border-b hairline pb-5">
+        <p className="label text-wine">Panel kreator</p>
+        <h1 className="font-display mt-2 text-3xl lg:text-4xl">Favorit Saya</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink/65">
+          Karya yang Anda simpan dari galeri, dikumpulkan dalam satu ruang pribadi.
         </p>
       </header>
 
-      {error && <p className="border-l-2 border-wine bg-wine/5 px-3 py-2 text-[13px] text-wine">{error}</p>}
-      {notice && <p className="label text-wine">{notice}</p>}
-
-      {!user ? (
-        <div className="border hairline bg-white p-8 text-center text-sm text-ink/55">
-          Masuk untuk melihat karya favorit Anda.{" "}
-          <Link href="/login" className="font-semibold text-wine underline">Masuk</Link>
-        </div>
-      ) : favorites.length === 0 ? (
-        <div className="border border-dashed border-ink/20 p-8 text-center text-sm text-ink/55">
-          Belum ada karya favorit. Simpan karya dari galeri untuk memulai koleksi.
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          {favorites.map((artwork) => (
-            <Link key={artwork.id} href={`/artwork/${artwork.id}`} className="art-card group block">
-              <div className="art-media">
-                <img
-                  src={artwork.image}
-                  alt={artwork.title}
-                  loading="lazy"
-                  className="art-img aspect-[4/3] w-full object-cover"
-                />
-              </div>
-              <div className="mt-3">
-                <p className="text-[14px] font-semibold group-hover:text-wine">{artwork.title}</p>
-                <p className="label mt-1 text-ink/55">
-                  {db.users.find((item) => item.id === artwork.userId)?.name ?? "Kreator"}
-                </p>
-              </div>
-            </Link>
+      <section className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setSelectedCollection("all")} className={`chip ${selectedCollection === "all" ? "active" : ""}`}>
+            Semua · {favoriteArtworks.length}
+          </button>
+          {collections.map((collection) => (
+            <button
+              key={collection.id}
+              type="button"
+              onClick={() => setSelectedCollection(collection.id)}
+              className={`chip ${selectedCollection === collection.id ? "active" : ""}`}
+            >
+              {collection.name}
+            </button>
           ))}
+          <button type="button" onClick={() => setShowNew(true)} className="chip">
+            <i className="fa-solid fa-plus text-[11px]" /> Koleksi baru
+          </button>
         </div>
-      )}
-
-      <section className="space-y-5 border hairline bg-white p-5 sm:p-6">
-        <div>
-          <div className="label text-wine">Member</div>
-          <h2 className="font-display mt-3 text-[28px] leading-none">Koleksi.</h2>
-          <p className="mt-2 text-[14px] leading-relaxed text-ink/65">
-            Kelompokkan favorit Anda ke dalam koleksi bernama.
-          </p>
-        </div>
-
-        <form onSubmit={createCollection} className="space-y-4 border hairline p-4">
-          <label className="block">
-            <span className="label">Nama koleksi</span>
-            <input
-              type="text"
-              value={newCollectionName}
-              onChange={(event) => setNewCollectionName(event.target.value)}
-              placeholder="Mis. Inspirasi Desain Karakter"
-              className="field mt-2"
-            />
-          </label>
-
-          {favorites.length > 0 && (
-            <div className="space-y-2">
-              <p className="label text-ink/65">Pilih karya untuk koleksi ini</p>
-              {favorites.map((artwork) => (
-                <label
-                  key={artwork.id}
-                  className="flex items-center gap-2.5 text-[13px] text-ink/70"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedCollectionIds.has(artwork.id)}
-                    onChange={() => toggleCollectionSelection(artwork.id)}
-                  />
-                  {artwork.title}
-                </label>
-              ))}
-            </div>
-          )}
-
-          <button type="submit" className="btn btn-ink btn-sm">Buat koleksi</button>
-        </form>
-
-        {collections.length === 0 ? (
-          <div className="border border-dashed border-ink/20 p-6 text-center text-[14px] text-ink/55">
-            Belum ada koleksi.
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {collections.map((collection) => (
-              <div key={collection.id} className="space-y-4 border-t hairline pt-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[15px] font-semibold">{collection.name}</p>
-                    <p className="label mt-1 text-ink/55">{collection.artworkIds.length} karya</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteCollection(collection.id)}
-                    className="btn btn-outline btn-sm !border-wine/40 !text-wine"
-                  >
-                    Hapus
-                  </button>
-                </div>
-                {collection.artworkIds.length > 0 && (
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-                    {collection.artworkIds.map((artworkId) => {
-                      const artwork = db.artworks.find((item) => item.id === artworkId);
-                      if (!artwork) return null;
-                      return (
-                        <div key={artworkId} className="relative border hairline bg-white">
-                          <Link href={`/artwork/${artwork.id}`} className="block">
-                            <div className="art-media">
-                              <img
-                                src={artwork.image}
-                                alt={artwork.title}
-                                loading="lazy"
-                                className="art-img aspect-[4/3] w-full object-cover"
-                              />
-                            </div>
-                            <div className="p-3">
-                              <p className="text-[14px] font-semibold">{artwork.title}</p>
-                              <p className="label mt-1 text-ink/55">
-                                {db.users.find((item) => item.id === artwork.userId)?.name ?? "Kreator"}
-                              </p>
-                            </div>
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => removeFromCollection(collection.id, artworkId)}
-                            className="btn btn-outline btn-sm absolute right-2 top-2 bg-white"
-                          >
-                            Keluar
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {favorites.some((item) => !collection.artworkIds.includes(item.id)) && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      value={addSelections[collection.id] ?? ""}
-                      onChange={(event) =>
-                        setAddSelections((current) => ({
-                          ...current,
-                          [collection.id]: event.target.value,
-                        }))
-                      }
-                      className="field min-w-[200px] flex-1"
-                    >
-                      <option value="">Tambah karya dari favorit...</option>
-                      {favorites
-                        .filter((item) => !collection.artworkIds.includes(item.id))
-                        .map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.title}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const artworkId = addSelections[collection.id];
-                        if (artworkId) addToCollection(collection.id, artworkId);
-                      }}
-                      className="btn btn-ink btn-sm"
-                    >
-                      Tambah
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+        {activeCollection && (
+          <div className="flex items-center gap-2">
+            <Link href={`/dashboard/favorites?collection=${activeCollection.id}`} className="btn btn-outline btn-sm">
+              <i className="fa-solid fa-pen text-[11px]" /> Kelola
+            </Link>
+            <button
+              type="button"
+              onClick={() => setDeletingCollection(activeCollection.id)}
+              className="btn btn-outline btn-sm text-wine hover:border-wine"
+            >
+              <i className="fa-solid fa-trash text-[11px]" /> Hapus koleksi
+            </button>
           </div>
         )}
       </section>
+
+      <div className="flex items-center justify-between border-b hairline pb-3">
+        <p className="label text-ink/65">
+          {activeCollection ? activeCollection.name : "Semua favorit"} · {visibleArtworks.length} karya
+        </p>
+        {user?.role === "member" && (
+          <Link href="/gallery" className="label inline-flex items-center gap-2 text-ink/65 hover:text-wine">
+            Cari karya lain
+            <i className="fa-solid fa-arrow-right text-[11px]" />
+          </Link>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="border border-dashed border-ink/20 p-10 text-center text-[14px] text-ink/55">
+          Memuat favorit...
+        </div>
+      ) : visibleArtworks.length ? (
+        <div className="columns-1 gap-8 sm:columns-2 xl:columns-3">
+          {visibleArtworks.map((artwork, index) => (
+            <div key={artwork.id} className="mb-8 break-inside-avoid">
+              <ArtworkCard
+                artwork={artwork}
+                creator={creators[String(artwork.userId)] ?? "Kreator"}
+                creatorId={String(artwork.userId).replace(/^u/, "")}
+                commentCount={0}
+                index={index}
+              />
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                <span className="label text-ink/50">{artCode(artwork.id)}</span>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowAddTo(artwork)} className="btn btn-outline btn-sm">
+                    <i className="fa-solid fa-folder-plus text-[11px]" /> Masukkan koleksi
+                  </button>
+                  {activeCollection && (
+                    <button type="button" onClick={() => setShowRemove(artwork)} className="btn btn-outline btn-sm text-wine hover:border-wine">
+                      <i className="fa-solid fa-xmark text-[11px]" /> Keluarkan
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="border border-dashed border-ink/20 p-10 text-center">
+          <i className="fa-regular fa-heart text-2xl text-ink/40" />
+          <h2 className="font-display mt-4 text-[24px]">
+            {activeCollection ? "Koleksi ini masih kosong" : "Belum ada karya favorit"}
+          </h2>
+          <p className="mt-2 text-sm text-ink/60">
+            {activeCollection
+              ? "Tambahkan karya favorit ke koleksi ini dari daftar Semua."
+              : "Tekan ikon hati pada karya di galeri untuk menyimpannya di sini."}
+          </p>
+          {user?.role === "member" && (
+            <Link href="/gallery" className="btn btn-outline btn-sm mt-5">Jelajahi galeri</Link>
+          )}
+        </div>
+      )}
+
+      <Modal open={showNew} onClose={() => setShowNew(false)} title="Koleksi baru" subtitle="Panel kreator" maxWidth="max-w-md">
+        <form onSubmit={addCollection}>
+          <label htmlFor="new-collection-name" className="label">Nama koleksi</label>
+          <input
+            id="new-collection-name"
+            type="text"
+            value={newName}
+            onChange={(event) => setNewName(event.target.value)}
+            placeholder="Misal: Arsip hitam putih"
+            className="field mt-2"
+            required
+          />
+          <p className="mt-2 text-[12px] leading-relaxed text-ink/55">
+            Koleksi disimpan di perangkat ini. Favorit karya tetap tersimpan di akun Anda.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => setShowNew(false)} className="btn btn-outline btn-sm">Batal</button>
+            <button type="submit" className="btn btn-ink btn-sm">Buat koleksi</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(showAddTo)}
+        onClose={() => setShowAddTo(null)}
+        title="Masukkan ke koleksi"
+        subtitle="Panel kreator"
+        maxWidth="max-w-md"
+      >
+        <p className="text-[14px] text-ink/70">
+          Pilih koleksi untuk <span className="font-medium text-ink">{showAddTo?.title}</span>.
+        </p>
+        <div className="mt-5 space-y-2">
+          {collections.length === 0 ? (
+            <p className="border border-dashed border-ink/20 p-4 text-center text-[13px] text-ink/55">
+              Belum ada koleksi. Buat koleksi terlebih dahulu.
+            </p>
+          ) : (
+            collections.map((collection) => (
+              <button
+                key={collection.id}
+                type="button"
+                onClick={() => addToCollection(collection.id)}
+                className={`flex w-full items-center justify-between border hairline px-4 py-3 text-left transition-colors hover:bg-canvas ${
+                  collectionHas(collection, showAddTo ?? { id: "" }) ? "opacity-55" : ""
+                }`}
+              >
+                <span className="font-medium">{collection.name}</span>
+                <span className="label text-ink/55">
+                  {collectionHas(collection, showAddTo ?? { id: "" }) ? "Sudah" : `${collection.artworkIds?.length ?? 0} karya`}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(showRemove)}
+        onClose={() => setShowRemove(null)}
+        onConfirm={removeFromCollection}
+        title="Keluarkan dari koleksi"
+        subtitle="Panel kreator"
+        message="Karya akan dikeluarkan dari koleksi ini, tetapi tetap tersimpan sebagai favorit."
+        confirmLabel="Ya, keluarkan"
+        danger
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingCollection)}
+        onClose={() => setDeletingCollection(null)}
+        onConfirm={deleteCollection}
+        title="Hapus koleksi"
+        subtitle="Panel kreator"
+        message="Koleksi akan dihapus dari perangkat. Favorit karya tidak terhapus."
+        confirmLabel="Ya, hapus"
+        danger
+      />
     </>
   );
 }

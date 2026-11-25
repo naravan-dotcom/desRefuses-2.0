@@ -1,317 +1,252 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import ConfirmDialog from "@/components/confirm-dialog";
 import Modal from "@/components/modal";
 import { notify } from "@/components/toast";
-import { isoNow, loadDb, saveDb, uid } from "@/lib/local-data";
-import { createSeedDb } from "@/lib/seed";
-import { useSession } from "@/lib/use-session";
+import { createArtwork, deleteArtwork, listArtworkPageData, updateArtwork } from "./actions";
 
-const MAX_FILE_SIZE = 1024 * 1024;
-const emptyForm = {
-  title: "",
-  description: "",
-  categoryId: "",
-  tags: "",
-  image: "",
-};
+function artCode(id) {
+  const digits = String(id ?? "").replace(/\D/g, "");
+  return digits ? `No. ${digits.padStart(2, "0")}` : `#${id}`;
+}
+
+function dateId(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function DashboardArtworksPage() {
-  const { user } = useSession();
-  const [db, setDb] = useState(() => createSeedDb());
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [fileName, setFileName] = useState("");
+  const [artworks, setArtworks] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [tags, setTags] = useState("");
+  const [image, setImage] = useState(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [confirmingId, setConfirmingId] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [showEdit, setShowEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  async function refresh() {
+    const result = await listArtworkPageData();
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setArtworks(result.artworks);
+    setCategories(result.categories);
+    setCategoryId((current) => current || result.categories[0]?.id || "");
+  }
+
+  useEffect(() => {
+    void Promise.resolve().then(refresh);
+  }, []);
 
   useEffect(() => {
     if (error) notify(error, "error");
   }, [error]);
 
-  useEffect(() => {
-    if (notice) notify(notice, "success");
-  }, [notice]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDb(loadDb()), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const artworks = useMemo(() => db.artworks.filter((item) => item.userId === user?.id), [db, user]);
-  const categoryNames = useMemo(
-    () => Object.fromEntries(db.categories.map((item) => [item.id, item.name])),
-    [db],
-  );
-  const confirming = confirmingId ? artworks.find((item) => item.id === confirmingId) ?? null : null;
-
-  function resetForm() {
-    setShowForm(false);
-    setEditingId(null);
-    setForm(emptyForm);
-    setFileName("");
+  function buildForm(values, file) {
+    const formData = new FormData();
+    Object.entries(values).forEach(([key, value]) => formData.set(key, String(value ?? "")));
+    if (file) formData.set("image", file);
+    return formData;
   }
 
-  function pickFile(event) {
-    const file = event.target.files?.[0];
+  async function addArtwork(event) {
+    event.preventDefault();
     setError("");
-    setNotice("");
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("File harus berupa gambar.");
-      setFileName("");
-      setForm((current) => ({ ...current, image: "" }));
+    const result = await createArtwork(
+      buildForm({ title, description, categoryId, tags }, image),
+    );
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    if (file.size > MAX_FILE_SIZE) {
-      setError("Ukuran gambar maksimal 1 MB.");
-      setFileName("");
-      setForm((current) => ({ ...current, image: "" }));
-      return;
-    }
-    setFileName(file.name);
-    setForm((current) => ({ ...current, image: "" }));
-    const reader = new FileReader();
-    reader.onload = () => {
-      setForm((current) => ({ ...current, image: typeof reader.result === "string" ? reader.result : "" }));
-    };
-    reader.onerror = () => setError("Gambar gagal dibaca.");
-    reader.readAsDataURL(file);
-  }
-
-  function startCreate() {
-    setError("");
-    setNotice("");
-    setConfirmingId(null);
-    setEditingId(null);
-    setForm({ ...emptyForm, categoryId: db.categories[0]?.id ?? "" });
-    setFileName("");
-    setShowForm(true);
+    setTitle("");
+    setDescription("");
+    setTags("");
+    setImage(null);
+    event.target.reset();
+    notify("Karya berhasil ditambahkan.", "success");
+    await refresh();
   }
 
   function startEdit(artwork) {
-    setError("");
-    setNotice("");
-    setConfirmingId(null);
-    setEditingId(artwork.id);
-    setForm({
+    setEditing({
+      id: artwork.id,
       title: artwork.title,
       description: artwork.description,
       categoryId: artwork.categoryId,
-      tags: (artwork.tags ?? []).join(", "),
+      tags: Array.isArray(artwork.tags) ? artwork.tags.join(", ") : "",
       image: artwork.image,
+      imageFile: null,
     });
-    setFileName("");
-    setShowForm(true);
-  }
-
-  function saveArtwork(event) {
-    event.preventDefault();
     setError("");
-    setNotice("");
-    if (!user || user.role !== "member") {
-      setError("Hanya Member yang bisa mengelola karya.");
-      return;
-    }
-    const title = form.title.trim();
-    const description = form.description.trim();
-    const tags = form.tags.split(",").map((item) => item.trim()).filter(Boolean);
-    if (!title || !description || !form.categoryId || tags.length === 0) {
-      setError("Judul, deskripsi, kategori, dan minimal satu tag wajib diisi.");
-      return;
-    }
-    if (!editingId && !form.image) {
-      setError("Pilih file gambar terlebih dahulu.");
-      return;
-    }
-    const next = loadDb();
-    if (editingId) {
-      const target = next.artworks.find((item) => item.id === editingId && item.userId === user.id);
-      if (!target) {
-        setError("Karya tidak ditemukan.");
-        return;
-      }
-      target.title = title;
-      target.description = description;
-      target.categoryId = form.categoryId;
-      target.tags = tags;
-      setNotice("Karya diperbarui.");
-    } else {
-      next.artworks.push({
-        id: uid("a"),
-        userId: user.id,
-        title,
-        description,
-        categoryId: form.categoryId,
-        tags,
-        image: form.image,
-        createdAt: isoNow(),
-        likes: 0,
-        likedBy: [],
-      });
-      setNotice("Karya berhasil diunggah.");
-    }
-    saveDb(next);
-    setDb(next);
-    setConfirmingId(null);
-    resetForm();
+    setShowEdit(true);
   }
 
-  function deleteArtwork(id) {
-    const next = loadDb();
-    const target = next.artworks.find((item) => item.id === id && item.userId === user?.id);
-    if (!target) return;
-    const removedComments = next.comments.filter((item) => item.artworkId === id).map((item) => item.id);
-    next.comments = next.comments.filter((item) => item.artworkId !== id);
-    next.submissions = next.submissions.filter((item) => item.artworkId !== id);
-    next.reports = next.reports.filter(
-      (item) =>
-        !(item.type === "artwork" && item.targetId === id) &&
-        !(item.type === "comment" && removedComments.includes(item.targetId)),
+  async function saveEdit() {
+    if (!editing) return;
+    setError("");
+    const result = await updateArtwork(
+      buildForm(
+        {
+          id: editing.id,
+          title: editing.title,
+          description: editing.description,
+          categoryId: editing.categoryId,
+          tags: editing.tags,
+          existingImage: editing.image,
+        },
+        editing.imageFile,
+      ),
     );
-    next.challenges.forEach((challenge) => {
-      ["first", "second", "third"].forEach((rank) => {
-        if (challenge.winners?.[rank] === id) challenge.winners[rank] = null;
-      });
-    });
-    next.users.forEach((item) => {
-      item.favorites = (item.favorites ?? []).filter((fav) => fav !== id);
-    });
-    next.artworks = next.artworks.filter((item) => item.id !== id);
-    saveDb(next);
-    setDb(next);
-    setConfirmingId(null);
-    resetForm();
-    setNotice("Karya dihapus beserta komentar dan submisinya.");
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setEditing(null);
+    setShowEdit(false);
+    notify("Karya berhasil diperbarui.", "success");
+    await refresh();
   }
+
+  async function removeArtwork() {
+    setError("");
+    const id = deletingId;
+    setDeletingId(null);
+    const result = await deleteArtwork(buildForm({ id }));
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    notify("Karya berhasil dihapus.", "success");
+    await refresh();
+  }
+
+  const categoryNames = Object.fromEntries(categories.map((category) => [category.id, category.name]));
 
   return (
     <>
-      <header className="border-b hairline pb-7">
-        <div className="label flex items-center gap-3 text-wine">
-          <span className="h-px w-8 bg-wine" />
-          Member
-        </div>
-        <h1 className="font-display mt-5 text-[38px] leading-none sm:text-[48px]">Karya saya.</h1>
-        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/65">
-          Kelola karya yang Anda pajang di galeri publik. Gambar disimpan di browser dengan batas 1 MB per karya.
+      <header className="border-b hairline pb-5">
+        <p className="label text-wine">Panel kreator</p>
+        <h1 className="font-display mt-2 text-3xl lg:text-4xl">Karya Saya</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink/65">
+          Unggah karya baru, perbarui detail, atau hapus karya yang tidak ingin ditampilkan.
         </p>
       </header>
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="label text-ink/65">{artworks.length} karya</p>
-        <button type="button" onClick={startCreate} className="btn btn-ink btn-sm">
-          <i className="fa-solid fa-plus" /> Unggah karya
-        </button>
-      </div>
-
-      <Modal
-        open={showForm}
-        onClose={resetForm}
-        subtitle={editingId ? "Perbarui karya" : "Karya baru"}
-        title={editingId ? "Edit karya" : "Unggah karya"}
-      >
-        <form onSubmit={saveArtwork} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="label">Judul karya</span>
+      <form onSubmit={addArtwork} className="grid gap-5 lg:grid-cols-12">
+        <div className="flex flex-col gap-4 lg:col-span-5">
+          <div>
+            <label htmlFor="artwork-image" className="label">Gambar karya</label>
+            <label
+              htmlFor="artwork-image"
+              className="art-media mt-2 flex aspect-[10/7] cursor-pointer flex-col items-center justify-center border border-dashed border-ink/25 text-center transition-colors hover:border-ink/60"
+            >
+              {image ? (
+                <img
+                  src={URL.createObjectURL(image)}
+                  alt="Pratinjau karya"
+                  className="art-img absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <>
+                  <i className="fa-regular fa-image text-2xl text-ink/40" />
+                  <span className="label mt-3 text-ink/65">Klik untuk pilih gambar</span>
+                  <span className="mt-1 text-[12px] text-ink/50">JPG, PNG, WEBP, GIF · maksimal 1 MB</span>
+                </>
+              )}
               <input
-                type="text"
-                value={form.title}
-                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Judul karya"
-                className="field mt-2"
+                id="artwork-image"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(event) => setImage(event.target.files?.[0] ?? null)}
+                className="sr-only"
               />
             </label>
-            <label className="block">
-              <span className="label">Kategori</span>
-              <select
-                value={form.categoryId}
-                onChange={(event) => setForm((current) => ({ ...current, categoryId: event.target.value }))}
-                className="field mt-2"
-              >
-                <option value="">Pilih kategori</option>
-                {db.categories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </select>
-            </label>
           </div>
-          <label className="block">
-            <span className="label">Deskripsi</span>
-            <textarea
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              rows={4}
-              placeholder="Ceritakan karya Anda"
-              className="field mt-2"
-            />
-          </label>
-          <label className="block">
-            <span className="label">Tags (dipisah koma, minimal satu)</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" className="btn btn-ink btn-lg">Unggah karya</button>
+            <span className="label text-ink/55">Tampil langsung di galeri</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 lg:col-span-7">
+          <div>
+            <label htmlFor="artwork-title" className="label">Judul karya</label>
             <input
+              id="artwork-title"
               type="text"
-              value={form.tags}
-              onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
-              placeholder="abstrak, warna, manifesto"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Judul yang ingin ditampilkan"
+              className="field mt-2"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="artwork-category" className="label">Kategori</label>
+            <select
+              id="artwork-category"
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+              className="field mt-2"
+              required
+            >
+              {categories.length === 0 && <option value="">Belum ada kategori</option>}
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="artwork-tags" className="label">Tag</label>
+            <input
+              id="artwork-tags"
+              type="text"
+              value={tags}
+              onChange={(event) => setTags(event.target.value)}
+              placeholder="Pisahkan dengan koma, misal: lukisan, monokrom"
               className="field mt-2"
             />
-          </label>
-          {editingId ? (
-            <p className="border border-dashed border-ink/20 p-3 text-[13px] leading-relaxed text-ink/55">
-              File karya tidak bisa diganti saat edit. Hapus dan unggah ulang karya untuk mengganti gambar.
-            </p>
-          ) : (
-            <label className="block">
-              <span className="label">File gambar (maksimal 1 MB)</span>
-              <input type="file" accept="image/*" onChange={pickFile} className="field mt-2" />
-            </label>
-          )}
-          {form.image && (
-            <div className="flex items-center gap-3 border hairline p-3">
-              <img src={form.image} alt="Pratinjau karya" className="h-16 w-16 object-cover" />
-              <p className="text-[13px] text-ink/55">{fileName || "Gambar karya saat ini"}</p>
-            </div>
-          )}
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button type="button" onClick={resetForm} className="btn btn-outline btn-sm">Batal</button>
-            <button type="submit" className="btn btn-ink btn-sm">
-              {editingId ? "Simpan perubahan" : "Unggah karya"}
-            </button>
           </div>
-        </form>
-      </Modal>
+          <div>
+            <label htmlFor="artwork-description" className="label">Deskripsi</label>
+            <textarea
+              id="artwork-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Ceritakan ide, teknik, atau makna karya..."
+              className="field mt-2 min-h-[110px] resize-y"
+              required
+            />
+          </div>
+        </div>
+      </form>
 
-      {error && <p className="border-l-2 border-wine bg-wine/5 px-3 py-2 text-[13px] text-wine">{error}</p>}
-      {notice && <p className="label text-wine">{notice}</p>}
-
-      <ConfirmDialog
-        open={Boolean(confirming)}
-        onClose={() => setConfirmingId(null)}
-        onConfirm={() => confirming && deleteArtwork(confirming.id)}
-        title="Hapus karya"
-        subtitle="Member"
-        message={
-          confirming
-            ? `Hapus "${confirming.title}"? Komentar, suka, favorit, laporan, dan submisi terkait ikut dihapus.`
-            : ""
-        }
-        danger
-        confirmLabel="Ya, hapus"
-      />
+      {error && (
+        <p className="border-l-2 border-wine bg-wine/5 px-4 py-3 text-[13px] text-wine">
+          {error}
+        </p>
+      )}
 
       <div className="border hairline bg-white">
+        <div className="flex items-center justify-between border-b hairline px-5 py-4">
+          <p className="label text-ink/65">Daftar karya</p>
+          <span className="text-[13px] text-ink/65">{artworks.length} karya</span>
+        </div>
         <div className="table-wrap">
           <table className="data">
             <thead>
               <tr>
                 <th>Karya</th>
                 <th>Kategori</th>
-                <th>Suka</th>
+                <th>Apresiasi</th>
                 <th>Tanggal</th>
                 <th className="text-right">Aksi</th>
               </tr>
@@ -319,39 +254,42 @@ export default function DashboardArtworksPage() {
             <tbody>
               {artworks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-ink/55">Belum ada karya. Unggah karya pertama Anda.</td>
+                  <td colSpan={5} className="px-4 py-10 text-center text-[14px] text-ink/55">
+                    Belum ada karya. Unggah karya pertama Anda di atas.
+                  </td>
                 </tr>
               ) : (
                 artworks.map((artwork) => (
                   <tr key={artwork.id}>
                     <td>
                       <div className="flex items-center gap-3">
-                        <img src={artwork.image} alt="" className="h-12 w-12 object-cover" />
-                        <div>
-                          <p className="font-semibold">{artwork.title}</p>
-                          <p className="label mt-1 text-ink/50">{(artwork.tags ?? []).map((tag) => `#${tag}`).join(" ")}</p>
-                          <Link href={`/artwork/${artwork.id}`} className="label mt-1 inline-block text-ink/55 hover:text-wine">
-                            Lihat di galeri
-                          </Link>
+                        <img src={artwork.image} alt="" className="h-11 w-14 shrink-0 object-cover" />
+                        <div className="min-w-0">
+                          <div className="font-medium">{artwork.title}</div>
+                          <div className="label mt-0.5 text-ink/45">{artCode(artwork.id)}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="text-ink/65">{categoryNames[artwork.categoryId] ?? "Tanpa kategori"}</td>
-                    <td className="text-ink/65">{artwork.likes}</td>
-                    <td className="text-ink/65">{artwork.createdAt?.slice(0, 10) ?? "—"}</td>
+                    <td className="text-ink/70">{categoryNames[artwork.categoryId] ?? "—"}</td>
+                    <td className="text-ink/70">{artwork.likes ?? 0} suka</td>
+                    <td className="text-ink/70">{dateId(artwork.createdAt)}</td>
                     <td>
                       <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => startEdit(artwork)} className="btn btn-outline btn-sm">Edit</button>
                         <button
                           type="button"
-                          onClick={() => {
-                            setError("");
-                            setNotice("");
-                            setConfirmingId(artwork.id);
-                          }}
-                          className="btn btn-outline btn-sm !border-wine/40 !text-wine"
+                          onClick={() => startEdit(artwork)}
+                          aria-label={`Edit ${artwork.title}`}
+                          className="btn btn-outline btn-sm"
                         >
-                          Hapus
+                          <i className="fa-solid fa-pen text-[11px]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingId(artwork.id)}
+                          aria-label={`Hapus ${artwork.title}`}
+                          className="btn btn-outline btn-sm text-wine hover:border-wine"
+                        >
+                          <i className="fa-solid fa-trash text-[11px]" />
                         </button>
                       </div>
                     </td>
@@ -361,7 +299,116 @@ export default function DashboardArtworksPage() {
             </tbody>
           </table>
         </div>
+        <div className="border-t hairline px-5 py-3 text-[12px] text-ink/55">
+          Karya langsung tampil di galeri publik setelah diunggah.
+        </div>
       </div>
+
+      <Modal
+        open={showEdit && Boolean(editing)}
+        onClose={() => {
+          setShowEdit(false);
+          setEditing(null);
+        }}
+        title="Edit karya"
+        subtitle="Panel kreator"
+        maxWidth="max-w-2xl"
+      >
+        {editing && (
+          <div className="grid gap-5 sm:grid-cols-12">
+            <div className="sm:col-span-5">
+              <label htmlFor="edit-artwork-image" className="label">Ganti gambar</label>
+              <label
+                htmlFor="edit-artwork-image"
+                className="art-media mt-2 flex aspect-[10/7] cursor-pointer items-center justify-center border border-dashed border-ink/25 transition-colors hover:border-ink/60"
+              >
+                <img src={editing.image} alt="" className="art-img absolute inset-0 h-full w-full object-cover" />
+                <span className="status status-approved relative">Klik untuk ganti</span>
+                <input
+                  id="edit-artwork-image"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(event) => setEditing({ ...editing, imageFile: event.target.files?.[0] ?? null })}
+                  className="sr-only"
+                />
+              </label>
+              <p className="mt-2 text-[12px] text-ink/50">
+                {editing.imageFile?.name ?? "Biarkan kosong untuk mempertahankan gambar saat ini."}
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:col-span-7">
+              <div>
+                <label htmlFor="edit-artwork-title" className="label">Judul karya</label>
+                <input
+                  id="edit-artwork-title"
+                  type="text"
+                  value={editing.title}
+                  onChange={(event) => setEditing({ ...editing, title: event.target.value })}
+                  className="field mt-1.5"
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-artwork-category" className="label">Kategori</label>
+                <select
+                  id="edit-artwork-category"
+                  value={editing.categoryId}
+                  onChange={(event) => setEditing({ ...editing, categoryId: event.target.value })}
+                  className="field mt-1.5"
+                >
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="edit-artwork-tags" className="label">Tag</label>
+                <input
+                  id="edit-artwork-tags"
+                  type="text"
+                  value={editing.tags}
+                  onChange={(event) => setEditing({ ...editing, tags: event.target.value })}
+                  className="field mt-1.5"
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-artwork-description" className="label">Deskripsi</label>
+                <textarea
+                  id="edit-artwork-description"
+                  value={editing.description}
+                  onChange={(event) => setEditing({ ...editing, description: event.target.value })}
+                  className="field mt-1.5 min-h-[84px] resize-y"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="mt-8 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowEdit(false);
+              setEditing(null);
+            }}
+            className="btn btn-outline btn-sm"
+          >
+            Batal
+          </button>
+          <button type="button" onClick={saveEdit} className="btn btn-ink btn-sm">
+            Simpan perubahan
+          </button>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deletingId)}
+        onClose={() => setDeletingId(null)}
+        onConfirm={removeArtwork}
+        title="Hapus karya"
+        subtitle="Panel kreator"
+        message="Karya akan dihapus permanen beserta suka, favorit, komentar, dan laporan terkait."
+        confirmLabel="Ya, hapus"
+        danger
+      />
     </>
   );
 }

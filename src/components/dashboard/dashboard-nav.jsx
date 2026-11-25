@@ -100,7 +100,7 @@ export default function DashboardNav() {
         </div>
         {user.role !== "admin" && (
           <Link
-            href={`/creator/${user.id}`}
+            href={`/creator/${user.dbId ?? String(user.id).replace(/^u/, "")}`}
             className="label mt-4 flex items-center gap-1.5 text-wine hover:text-ink"
           >
             Profil publik <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />

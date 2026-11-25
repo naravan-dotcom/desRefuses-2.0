@@ -145,7 +145,7 @@ export default function Navbar() {
                       </Link>
                     ))}
                     <Link
-                      href={`/creator/${user.id}`}
+                      href={`/creator/${user.dbId ?? String(user.id).replace(/^u/, "")}`}
                       className="block px-4 py-2.5 font-label text-[13px] uppercase tracking-normal hover:bg-ink/[0.04]"
                     >
                       Profil Publik
@@ -210,7 +210,7 @@ export default function Navbar() {
           ))}
           {user && (
             <Link
-              href={`/creator/${user.id}`}
+              href={`/creator/${user.dbId ?? String(user.id).replace(/^u/, "")}`}
               onClick={() => setMobileOpen(false)}
               className="font-display text-[27px] text-paper"
             >

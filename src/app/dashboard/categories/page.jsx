@@ -1,18 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import ConfirmDialog from "@/components/confirm-dialog";
 import Modal from "@/components/modal";
 import { notify } from "@/components/toast";
-import { loadDb, saveDb, uid } from "@/lib/local-data";
-import { createSeedDb } from "@/lib/seed";
-
-function slugify(name) {
-  return name.toLowerCase().trim().replace(/\s+/g, "-");
-}
+import { createCategory, deleteCategory, listCategoryAdminData, updateCategory } from "./actions";
 
 export default function DashboardCategoriesPage() {
-  const [db, setDb] = useState(() => createSeedDb());
+  const [categories, setCategories] = useState([]);
+  const [counts, setCounts] = useState({});
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -20,44 +16,41 @@ export default function DashboardCategoriesPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+  async function refresh() {
+    const result = await listCategoryAdminData();
+    if (result.ok) {
+      setCategories(result.categories);
+      setCounts(result.counts);
+    } else {
+      setError(result.error);
+    }
+  }
+
+  useEffect(() => {
+    void Promise.resolve().then(refresh);
+  }, []);
+
   useEffect(() => {
     if (error) notify(error, "error");
   }, [error]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDb(loadDb()), 0);
-    return () => clearTimeout(timer);
-  }, []);
+  function formWith(entries) {
+    const formData = new FormData();
+    Object.entries(entries).forEach(([key, value]) => formData.set(key, String(value ?? "")));
+    return formData;
+  }
 
-  const counts = useMemo(() => {
-    return db.artworks.reduce((acc, artwork) => {
-      acc[artwork.categoryId] = (acc[artwork.categoryId] ?? 0) + 1;
-      return acc;
-    }, {});
-  }, [db]);
-
-  function addCategory(event) {
+  async function addCategory(event) {
     event.preventDefault();
     setError("");
-    const clean = name.trim();
-    if (!clean) {
-      setError("Nama kategori wajib diisi.");
+    const result = await createCategory(formWith({ name }));
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    const next = loadDb();
-    if (
-      next.categories.some(
-        (item) => item.name.toLowerCase() === clean.toLowerCase(),
-      )
-    ) {
-      setError("Nama kategori sudah dipakai.");
-      return;
-    }
-    next.categories.push({ id: uid("cat"), name: clean, slug: slugify(clean) });
-    saveDb(next);
-    setDb(next);
     setName("");
     notify("Kategori berhasil ditambahkan.", "success");
+    await refresh();
   }
 
   function startEdit(category) {
@@ -67,46 +60,30 @@ export default function DashboardCategoriesPage() {
     setShowEdit(true);
   }
 
-  function saveEdit(id) {
+  async function saveEdit() {
     setError("");
-    const clean = editName.trim();
-    if (!clean) {
-      setError("Nama kategori wajib diisi.");
+    const result = await updateCategory(formWith({ id: editingId, name: editName }));
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    const next = loadDb();
-    if (
-      next.categories.some(
-        (item) =>
-          item.id !== id && item.name.toLowerCase() === clean.toLowerCase(),
-      )
-    ) {
-      setError("Nama kategori sudah dipakai.");
-      return;
-    }
-    const target = next.categories.find((item) => item.id === id);
-    if (!target) return;
-    target.name = clean;
-    target.slug = slugify(clean);
-    saveDb(next);
-    setDb(next);
     setEditingId(null);
     setShowEdit(false);
     notify("Kategori berhasil diperbarui.", "success");
+    await refresh();
   }
 
-  function deleteCategory(id) {
+  async function removeCategory() {
     setError("");
+    const id = deletingId;
     setDeletingId(null);
-    const next = loadDb();
-    if (next.artworks.some((item) => item.categoryId === id)) {
-      setError("Kategori masih dipakai karya dan tidak bisa dihapus.");
+    const result = await deleteCategory(formWith({ id }));
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    next.categories = next.categories.filter((item) => item.id !== id);
-    saveDb(next);
-    setDb(next);
     notify("Kategori berhasil dihapus.", "success");
+    await refresh();
   }
 
   return (
@@ -122,6 +99,7 @@ export default function DashboardCategoriesPage() {
       <form onSubmit={addCategory} className="flex flex-wrap items-center gap-3">
         <input
           type="text"
+          name="name"
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="Nama kategori baru"
@@ -141,7 +119,7 @@ export default function DashboardCategoriesPage() {
       <div className="border hairline bg-white">
         <div className="flex items-center justify-between border-b hairline px-5 py-4">
           <p className="label text-ink/65">Kategori karya</p>
-          <span className="text-[13px] text-ink/65">{db.categories.length} kategori</span>
+          <span className="text-[13px] text-ink/65">{categories.length} kategori</span>
         </div>
         <div className="table-wrap">
           <table className="data">
@@ -154,14 +132,14 @@ export default function DashboardCategoriesPage() {
               </tr>
             </thead>
             <tbody>
-              {db.categories.length === 0 ? (
+              {categories.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-10 text-center text-[14px] text-ink/55">
                     Belum ada kategori.
                   </td>
                 </tr>
               ) : (
-                db.categories.map((category) => {
+                categories.map((category) => {
                   const used = counts[category.id] ?? 0;
                   return (
                     <tr key={category.id}>
@@ -231,7 +209,7 @@ export default function DashboardCategoriesPage() {
           </button>
           <button
             type="button"
-            onClick={() => saveEdit(editingId)}
+            onClick={saveEdit}
             className="btn btn-ink btn-sm"
           >
             Simpan
@@ -242,7 +220,7 @@ export default function DashboardCategoriesPage() {
       <ConfirmDialog
         open={Boolean(deletingId)}
         onClose={() => setDeletingId(null)}
-        onConfirm={() => deleteCategory(deletingId)}
+        onConfirm={removeCategory}
         title="Hapus kategori"
         subtitle="Panel admin"
         message="Kategori akan dihapus permanen. Kategori yang masih dipakai karya tidak dapat dihapus."

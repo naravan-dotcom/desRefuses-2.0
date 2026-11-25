@@ -1,128 +1,28 @@
-"use client";
+import pool from "@/lib/db";
+import { toArtwork, toCategory } from "@/lib/db-shape";
+import GalleryClient from "./gallery-client";
 
-import { useEffect, useMemo, useState } from "react";
-import ArtworkCard from "@/components/artwork-card";
-import { loadDb } from "@/lib/local-data";
-import { createSeedDb } from "@/lib/seed";
+export default async function GalleryPage() {
+  const [categoriesResult, artworksResult, usersResult, commentsResult] = await Promise.all([
+    pool.query("SELECT id, name, slug FROM categories ORDER BY id ASC"),
+    pool.query("SELECT * FROM artworks ORDER BY created_at DESC"),
+    pool.query("SELECT id, name FROM users"),
+    pool.query("SELECT artwork_id, COUNT(*)::int AS total FROM comments GROUP BY artwork_id"),
+  ]);
 
-export default function GalleryPage() {
-  const [db, setDb] = useState(() => createSeedDb());
-  const [query, setQuery] = useState("");
-  const [categoryId, setCategoryId] = useState("all");
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDb(loadDb()), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const categories = useMemo(() => db.categories ?? [], [db]);
-  const creators = useMemo(
-    () => Object.fromEntries((db.users ?? []).map((user) => [user.id, user.name])),
-    [db],
-  );
-  const categoryNames = useMemo(
-    () => Object.fromEntries(categories.map((category) => [category.id, category.name])),
-    [categories],
-  );
-  const commentCounts = useMemo(() => {
-    return (db.comments ?? []).reduce((counts, comment) => {
-      counts[comment.artworkId] = (counts[comment.artworkId] ?? 0) + 1;
-      return counts;
-    }, {});
-  }, [db]);
-
-  const artworks = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (db.artworks ?? []).filter((artwork) => {
-      if (categoryId !== "all" && artwork.categoryId !== categoryId) return false;
-      if (!needle) return true;
-      const creator = creators[artwork.userId] ?? "";
-      return [artwork.title, creator, ...(artwork.tags ?? [])]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle));
-    });
-  }, [db, query, categoryId, creators]);
+  const categories = categoriesResult.rows.map(toCategory);
+  const artworks = artworksResult.rows.map(toArtwork);
+  const creators = Object.fromEntries(usersResult.rows.map((row) => [`u${row.id}`, row.name]));
+  const categoryNames = Object.fromEntries(categories.map((category) => [category.id, category.name]));
+  const commentCounts = Object.fromEntries(commentsResult.rows.map((row) => [String(row.artwork_id), Number(row.total)]));
 
   return (
-    <main className="page-enter">
-      <section className="border-b hairline">
-        <div className="mx-auto max-w-[1240px] px-5 py-14 lg:px-10 lg:py-20">
-          <div className="label flex items-center gap-4 text-ink/65"><span>Galeri publik</span></div>
-          <h1 className="font-display mt-6 text-[44px] leading-[1.06] sm:text-[59px] lg:text-[68px]">
-            Karya tanpa<br />seleksi juri.
-          </h1>
-          <p className="mt-6 max-w-2xl text-[15px] leading-[1.7] text-ink/65">
-            Jelajahi karya yang dipajang langsung oleh para kreator. Tidak ada kurasi untuk tampil — apresiasi datang dari publik.
-          </p>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1240px] px-5 py-12 lg:px-10 lg:py-16">
-        <div className="flex flex-col gap-5 border-b hairline pb-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="relative w-full lg:max-w-sm">
-            <i className="fa-solid fa-magnifying-glass absolute left-0 top-1/2 -translate-y-1/2 text-xs text-ink/65" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari judul, kreator, atau tag..."
-              className="field pl-6 text-[15px]"
-            />
-          </div>
-          <div className="-mx-1 flex items-center gap-6 overflow-x-auto px-1 pb-1">
-            <button type="button" onClick={() => setCategoryId("all")} className={`chip ${categoryId === "all" ? "active" : ""}`}>
-              Semua
-            </button>
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                onClick={() => setCategoryId(category.id)}
-                className={`chip ${categoryId === category.id ? "active" : ""}`}
-              >
-                {category.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <p className="label mt-6 text-ink/65">
-          <span className="font-semibold text-ink/80">{artworks.length}</span> karya ditemukan
-          {query ? ` untuk “${query}”` : ""}
-        </p>
-
-        {artworks.length ? (
-          <div className="mt-8 columns-1 gap-8 sm:columns-2 xl:columns-3">
-            {artworks.map((artwork, index) => (
-              <ArtworkCard
-                key={artwork.id}
-                artwork={artwork}
-                creator={creators[artwork.userId]}
-                creatorId={artwork.userId}
-                category={categoryNames[artwork.categoryId]}
-                commentCount={commentCounts[artwork.id] ?? 0}
-                index={index}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-8 border border-dashed border-ink/20 p-10 text-center">
-            <i className="fa-regular fa-folder-open text-2xl text-ink/40" />
-            <h2 className="font-display mt-4 text-[24px]">Belum ada karya yang cocok</h2>
-            <p className="mt-2 text-sm text-ink/60">Coba kata kunci lain atau pilih kategori berbeda.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                setCategoryId("all");
-              }}
-              className="btn btn-outline btn-sm mt-5"
-            >
-              Reset filter
-            </button>
-          </div>
-        )}
-      </section>
-    </main>
+    <GalleryClient
+      categories={categories}
+      artworks={artworks}
+      creators={creators}
+      categoryNames={categoryNames}
+      commentCounts={commentCounts}
+    />
   );
 }
