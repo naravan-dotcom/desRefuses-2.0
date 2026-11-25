@@ -56,22 +56,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.avatar = user.image;
       }
 
-      if (token.dbId) {
-        const { rows } = await pool.query(
-          "SELECT role, status, name, username, email, avatar FROM users WHERE id = $1",
-          [token.dbId],
-        );
-        const row = rows[0];
-        if (row) {
-          token.role = row.role;
-          token.status = row.status;
-          token.name = row.name;
-          token.username = row.username;
-          token.email = row.email;
-          token.avatar = row.avatar || null;
-        }
-      }
-
       return token;
     },
     async session({ session, token }) {
@@ -82,6 +66,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.username = token.username;
       session.user.avatar = token.avatar;
       session.user.image = token.avatar;
+
+      if (token.dbId) {
+        const { rows } = await pool.query(
+          "SELECT role, status, name, username, email, avatar, suspension_reason FROM users WHERE id = $1",
+          [token.dbId],
+        );
+        const row = rows[0];
+        if (row) {
+          session.user.role = row.role;
+          session.user.status = row.status;
+          session.user.name = row.name;
+          session.user.username = row.username;
+          session.user.email = row.email;
+          session.user.avatar = row.avatar || null;
+          session.user.image = row.avatar || null;
+          session.user.suspensionReason = row.suspension_reason ?? "";
+        }
+      }
+
       return session;
     },
   },

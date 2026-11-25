@@ -1,41 +1,14 @@
-"use client";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import DashboardLayoutClient from "@/components/dashboard/dashboard-layout-client";
 
-import { usePathname } from "next/navigation";
-import DashboardShell from "@/components/dashboard/dashboard-shell";
-import DashboardNav, { canOpen } from "@/components/dashboard/dashboard-nav";
-import SessionLoading from "@/components/ui/session-loading";
-import { useSession } from "@/lib/use-session";
+export default async function DashboardLayout({ children }) {
+  const session = await auth();
+  const user = session?.user;
 
-export default function DashboardLayout({ children }) {
-  const pathname = usePathname();
-  const { user, ready } = useSession();
+  if (!user) redirect("/login");
+  if (user.status === "suspended") redirect("/suspended");
+  if (user.role === "curator" && user.status !== "approved") redirect("/pending");
 
-  const suspended = Boolean(user && user.status === "suspended");
-  const pendingCurator = Boolean(
-    user && user.role === "curator" && user.status !== "approved" && user.status !== "suspended",
-  );
-  const allowed = Boolean(
-    ready && user && !suspended && !pendingCurator && canOpen(user.role, pathname),
-  );
-
-  if (!allowed) {
-    return (
-      <div className="page-enter grid min-h-[60vh] place-items-center px-5">
-        <SessionLoading />
-      </div>
-    );
-  }
-
-  const roomLabel =
-    user.role === "curator"
-      ? "Ruang curator"
-      : user.role === "admin"
-        ? "Ruang admin"
-        : "Ruang member";
-
-  return (
-    <DashboardShell label={roomLabel} nav={<DashboardNav />}>
-      {children}
-    </DashboardShell>
-  );
+  return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
 }

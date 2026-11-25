@@ -1,11 +1,26 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getToken } from "next-auth/jwt";
 import { canOpenDashboard, homeForUser } from "@/lib/access";
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
-  const session = await auth();
-  const user = session?.user ?? null;
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secureCookie: request.nextUrl.protocol === "https:",
+  });
+  const user = token
+    ? {
+        id: token.id,
+        dbId: token.dbId,
+        role: token.role,
+        status: token.status,
+        name: token.name,
+        username: token.username,
+        email: token.email,
+        image: token.avatar ?? token.picture,
+      }
+    : null;
 
   if (pathname.startsWith("/dashboard")) {
     if (!user) return NextResponse.redirect(new URL("/login", request.url));
