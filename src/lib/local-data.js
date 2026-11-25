@@ -1,6 +1,6 @@
 import { createSeedDb } from "@/lib/seed";
 
-const DB_KEY = "desrefuses_db_v1";
+const DB_KEY = "desrefuses_db_v2";
 const SESSION_KEY = "desrefuses_session_v1";
 
 export function loadDb() {

@@ -122,7 +122,7 @@ export function createSeedDb() {
       {
         id: "u5",
         role: "member",
-        status: "approved",
+        status: "suspended",
         name: "Balthazar K.",
         username: "balthazar",
         email: "balthazar@desrefuses.id",
@@ -133,6 +133,8 @@ export function createSeedDb() {
         favorites: [],
         following: ["u2"],
         joinedAt: iso(-190),
+        suspensionReason: "Komentar berulang yang menyerang member lain.",
+        suspendedAt: iso(-3),
       },
       {
         id: "u10",

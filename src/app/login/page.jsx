@@ -9,6 +9,7 @@ import { notifySessionChange } from "@/lib/use-session";
 
 const demoAccounts = [
   { role: "Member", name: "Sora Vane", email: "sora@desrefuses.id", password: "member123" },
+  { role: "Member ditangguhkan", name: "Balthazar K.", email: "balthazar@desrefuses.id", password: "member123" },
   { role: "Admin", name: "Nadia Pratama", email: "admin@desrefuses.id", password: "admin123" },
   { role: "Curator approved", name: "Musée Libre Paris", email: "musee@desrefuses.id", password: "curator123" },
   { role: "Curator pending", name: "DAO Hectic Arts", email: "dao@desrefuses.id", password: "curator123" },
@@ -36,7 +37,8 @@ export default function LoginPage() {
     }
     setSessionId(user.id);
     notifySessionChange();
-    if (user.role === "curator" && user.status !== "approved") router.push("/pending");
+    if (user.status === "suspended") router.push("/suspended");
+    else if (user.role === "curator" && user.status !== "approved") router.push("/pending");
     else if (user.role === "admin") router.push("/dashboard");
     else if (user.role === "curator") router.push("/dashboard/challenges");
     else router.push("/home");

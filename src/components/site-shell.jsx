@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import PageProgress from "@/components/page-progress";
+import { useSession } from "@/lib/use-session";
 
 export default function SiteShell({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, ready } = useSession();
+
+  useEffect(() => {
+    if (!ready || !user || user.status !== "suspended") return;
+    if (pathname === "/suspended" || pathname === "/login" || pathname === "/") return;
+    router.replace("/suspended");
+  }, [ready, user, pathname, router]);
 
   useEffect(() => {
     const nodes = document.querySelectorAll("[data-reveal]");

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import AuthShell from "@/components/auth-shell";
 import ConfirmDialog from "@/components/confirm-dialog";
 import { loadDb, saveDb } from "@/lib/local-data";
 import { logout, useSession } from "@/lib/use-session";
@@ -13,7 +12,9 @@ export default function PendingCuratorPage() {
   const { user, ready } = useSession();
   const [confirming, setConfirming] = useState(false);
 
-  const isPendingCurator = Boolean(user && user.role === "curator" && user.status !== "approved");
+  const isPendingCurator = Boolean(
+    user && user.role === "curator" && (user.status === "pending" || user.status === "rejected"),
+  );
 
   useEffect(() => {
     if (!ready) return;
@@ -21,12 +22,16 @@ export default function PendingCuratorPage() {
       router.replace("/login");
       return;
     }
-    if (user.role !== "curator" || user.status === "approved") {
+    if (user.status === "suspended") {
+      router.replace("/suspended");
+      return;
+    }
+    if (!isPendingCurator) {
       if (user.role === "admin") router.replace("/dashboard");
       else if (user.role === "curator") router.replace("/dashboard/challenges");
       else router.replace("/home");
     }
-  }, [ready, user, router]);
+  }, [ready, user, router, isPendingCurator]);
 
   function handleDelete() {
     const db = loadDb();
@@ -46,8 +51,8 @@ export default function PendingCuratorPage() {
 
   const rejected = user.status === "rejected";
   const description = rejected
-    ? "Admin menolak pendaftaran kurator ini. Anda dapat menghapus akun yang telah didaftarkan, lalu mendaftar ulang dengan informasi yang lebih baik."
-    : "Admin akan meninjau pendaftaran kurator Anda. Selama menunggu, Anda tetap bisa menjelajahi karya seperti tamu, tetapi dashboard belum bisa diakses.";
+    ? "Admin menolak pengajuan akun curator Anda. Anda tidak dapat mengakses dashboard curator. Sesuai ketentuan, akun yang ditolak hanya dapat dihapus melalui halaman ini."
+    : "Terima kasih telah mendaftar sebagai curator. Admin sedang memverifikasi identitas dan maksud penyelenggaraan event Anda. Dashboard curator akan terbuka setelah disetujui.";
   const steps = [
     ["01", "Pendaftaran", true],
     ["02", "Verifikasi admin", !rejected],
@@ -55,68 +60,81 @@ export default function PendingCuratorPage() {
   ];
 
   return (
-    <AuthShell mode="pending">
-      <div className="label text-wine">Status akun curator</div>
-      <h1 className="font-display mt-5 text-[34px] leading-[1.12] tracking-[-0.01em] lg:text-[40px]">
-        {rejected ? <>Pendaftaran<br />ditolak.</> : <>Akun sedang<br />ditinjau.</>}
-      </h1>
-      <p className="mt-5 text-[14px] leading-[1.7] text-ink/65">{description}</p>
-
-      <div className="mt-8 border hairline bg-white p-5">
-        <div className="label text-wine">Detail akun</div>
-        <div className="mt-4 space-y-2 text-[13px] text-ink/65">
-          <p><span className="text-ink/45">Nama:</span> {user.name}</p>
-          <p><span className="text-ink/45">Email:</span> {user.email}</p>
-          <p>
-            <span className="text-ink/45">Status:</span>{" "}
+    <main className="page-enter mx-auto max-w-3xl px-5 py-14 lg:px-8">
+      <div className="border hairline bg-white">
+        <div className="border-b hairline p-7 sm:p-10">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="label text-ink/65">Status akun curator</div>
+              <h1 className="font-display mt-2 text-3xl font-bold sm:text-4xl">
+                {rejected ? "Pendaftaran ditolak." : "Akun Anda sedang ditinjau."}
+              </h1>
+            </div>
             <span className={`status ${rejected ? "status-rejected" : "status-pending"}`}>
               {rejected ? "Rejected" : "Pending"}
             </span>
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-3 gap-px border-y hairline bg-ink/10">
-        {steps.map(([num, label, done]) => (
-          <div key={num} className="bg-white px-4 py-5">
-            <div className={`label ${done ? "text-wine" : "text-ink/45"}`}>{num}</div>
-            <div className="mt-2 text-[13px] font-semibold leading-snug">{label}</div>
           </div>
-        ))}
+          <p className="mt-4 text-[16px] leading-relaxed text-ink/80">{description}</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-px border-b hairline bg-ink/10 p-px">
+          {steps.map(([num, label, active]) => (
+            <div key={num} className="bg-white p-4">
+              <div className="flex items-center gap-2">
+                <span className={`label ${active ? "text-pink" : "text-ink/65"}`}>{num}</span>
+                <span className={`text-[12px] font-label uppercase tracking-normal ${active ? "text-ink" : "text-ink/65"}`}>
+                  {active ? "Aktif" : "Menunggu"}
+                </span>
+              </div>
+              <div className={`mt-2 text-[14px] font-semibold ${active ? "" : "text-ink/65"}`}>{label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col justify-between gap-4 p-7 sm:flex-row sm:items-center sm:p-10">
+          <div>
+            <div className="label text-ink/65">Login sebagai</div>
+            <div className="mt-1 text-[15px] font-semibold">
+              {user.name} <span className="font-normal text-ink/65">@{user.username}</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/home" className="btn btn-outline btn-sm">Jelajahi galeri</Link>
+            {rejected ? (
+              <button type="button" onClick={() => setConfirming(true)} className="btn btn-pink btn-sm">
+                <i className="fa-solid fa-trash" />
+                Hapus akun
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  router.push("/login");
+                }}
+                className="btn btn-outline btn-sm"
+              >
+                Keluar
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {rejected ? (
-        <div className="mt-6 space-y-3">
-          <button type="button" onClick={() => setConfirming(true)} className="btn btn-wine w-full">Hapus akun</button>
-        </div>
-      ) : (
-        <Link href="/gallery" className="btn btn-ink mt-6 w-full">Jelajahi galeri</Link>
-      )}
-
-      <p className="mt-6 text-center text-[13px] text-ink/60">
-        Bukan akun Anda?{" "}
-        <button
-          type="button"
-          onClick={() => {
-            logout();
-            router.push("/login");
-          }}
-          className="text-wine underline underline-offset-4"
-        >
-          Keluar
-        </button>
+      <p className="mt-4 text-center text-[13px] font-label text-ink/65">
+        Keputusan verifikasi tidak berdasarkan selera karya. Butuh bantuan? Hubungi admin melalui kanal komunitas.
       </p>
 
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
         onConfirm={handleDelete}
-        title="Hapus akun"
+        title="Hapus akun curator?"
         subtitle="Curator"
-        message="Hapus akun ini secara permanen? Tindakan ini tidak dapat dibatalkan."
+        message="Akun, data profil, dan riwayat pendaftaran akan dihapus permanen dari platform demo ini."
         danger
-        confirmLabel="Ya, hapus akun"
+        confirmLabel="Hapus akun saya"
       />
-    </AuthShell>
+    </main>
   );
 }

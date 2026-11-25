@@ -54,6 +54,26 @@ function formatDate(value) {
   return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
+function dateInputValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function nextDateInput(value) {
+  const date = new Date(`${value}T00:00:00`);
+  date.setDate(date.getDate() + 1);
+  return dateInputValue(date);
+}
+
+function isDateInput(value) {
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    dateInputValue(new Date(`${value}T00:00:00`)) === value
+  );
+}
+
 export default function DashboardChallengesPage() {
   const { user } = useSession();
   const router = useRouter();
@@ -76,6 +96,7 @@ export default function DashboardChallengesPage() {
   const [confirmingId, setConfirmingId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [winnerDraft, setWinnerDraft] = useState({ first: null, second: null, third: null });
+  const today = dateInputValue(new Date());
 
   useEffect(() => {
     const timer = setTimeout(() => setDb(loadDb()), 0);
@@ -185,7 +206,11 @@ export default function DashboardChallengesPage() {
     setConfirmingId(null);
     setSelectedId(null);
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      startDate: today,
+      endDate: nextDateInput(today),
+    });
     setFileName("");
     setShowForm(true);
     router.replace("/dashboard/challenges?create=1", { scroll: false });
@@ -233,10 +258,12 @@ export default function DashboardChallengesPage() {
       return;
     }
 
-    const start = new Date(`${startDate}T00:00:00`);
-    const end = new Date(`${endDate}T23:59:59`);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-      setError("Tanggal selesai harus setelah tanggal mulai.");
+    if (!isDateInput(startDate) || startDate < today) {
+      setError("Tanggal mulai tidak boleh sebelum hari ini.");
+      return;
+    }
+    if (!isDateInput(endDate) || endDate <= startDate || endDate <= today) {
+      setError("Tanggal selesai harus setelah tanggal mulai dan tidak boleh hari ini.");
       return;
     }
 
@@ -446,6 +473,7 @@ export default function DashboardChallengesPage() {
                 type="date"
                 required
                 value={form.startDate}
+                min={today}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, startDate: event.target.value }))
                 }
@@ -458,6 +486,11 @@ export default function DashboardChallengesPage() {
                 type="date"
                 required
                 value={form.endDate}
+                min={
+                  form.startDate && form.startDate > today
+                    ? nextDateInput(form.startDate)
+                    : nextDateInput(today)
+                }
                 onChange={(event) =>
                   setForm((current) => ({ ...current, endDate: event.target.value }))
                 }

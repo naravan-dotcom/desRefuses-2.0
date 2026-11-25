@@ -14,6 +14,7 @@ export default function Footer() {
   }
 
   function handleReset() {
+    window.localStorage.removeItem("desrefuses_db_v2");
     window.localStorage.removeItem("desrefuses_db_v1");
     logout();
     router.push("/home");
@@ -46,8 +47,17 @@ export default function Footer() {
             <div className="flex flex-col gap-3 font-label text-[13px] uppercase tracking-normal text-paper/60">
               {user ? (
                 <>
-                  <Link href={user.role === "curator" && user.status !== "approved" ? "/pending" : "/dashboard"} className="hover:text-acid">
-                    Dashboard
+                  <Link
+                    href={
+                      user.status === "suspended"
+                        ? "/suspended"
+                        : user.role === "curator" && user.status !== "approved"
+                          ? "/pending"
+                          : "/dashboard"
+                    }
+                    className="hover:text-acid"
+                  >
+                    {user.status === "suspended" ? "Status Akun" : "Dashboard"}
                   </Link>
                   <button type="button" onClick={handleLogout} className="text-left hover:text-acid">
                     Keluar

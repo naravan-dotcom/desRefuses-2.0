@@ -87,6 +87,8 @@ export default function DashboardPage() {
     const target = next.users.find((item) => item.id === id && item.role === "curator");
     if (!target) return;
     target.status = "approved";
+    target.suspensionReason = "";
+    target.suspendedAt = null;
     saveDb(next);
     setDb(next);
   }

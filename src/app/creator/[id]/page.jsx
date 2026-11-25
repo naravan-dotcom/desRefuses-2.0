@@ -108,7 +108,7 @@ export default function CreatorPage() {
               <p className="mt-2 text-[15px] text-ink/60">@{creator.username}</p>
               {creator.status && creator.role === "curator" && (
                 <span className={`status mt-4 ${creator.status === "approved" ? "status-approved" : creator.status === "pending" ? "status-pending" : "status-rejected"}`}>
-                  Kurator {creator.status}
+                  Kurator {creator.status === "approved" ? "Approved" : creator.status === "pending" ? "Pending" : "Rejected"}
                 </span>
               )}
               {creator.bio && <p className="mt-6 max-w-2xl text-[15px] leading-[1.8] text-ink/70">{creator.bio}</p>}

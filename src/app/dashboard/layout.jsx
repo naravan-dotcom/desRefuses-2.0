@@ -12,11 +12,12 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const { user, ready } = useSession();
 
+  const suspended = Boolean(user && user.status === "suspended");
   const pendingCurator = Boolean(
-    user && user.role === "curator" && user.status !== "approved",
+    user && user.role === "curator" && user.status !== "approved" && user.status !== "suspended",
   );
   const allowed = Boolean(
-    ready && user && !pendingCurator && canOpen(user.role, pathname),
+    ready && user && !suspended && !pendingCurator && canOpen(user.role, pathname),
   );
 
   useEffect(() => {
@@ -26,6 +27,10 @@ export default function DashboardLayout({ children }) {
     const current = db.users.find((item) => item.id === id) ?? null;
     if (!current) {
       router.replace("/login");
+      return;
+    }
+    if (current.status === "suspended") {
+      router.replace("/suspended");
       return;
     }
     if (current.role === "curator" && current.status !== "approved") {

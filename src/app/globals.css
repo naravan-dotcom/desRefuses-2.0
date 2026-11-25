@@ -422,6 +422,12 @@ textarea.field {
   border-color: rgba(122, 31, 61, 0.3);
 }
 
+.status-suspended {
+  background: rgba(122, 31, 61, 0.08);
+  color: var(--color-wine);
+  border-color: rgba(122, 31, 61, 0.3);
+}
+
 .card {
   background: var(--color-canvas);
   border: 1px solid var(--color-line);

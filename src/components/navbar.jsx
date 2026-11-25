@@ -13,6 +13,9 @@ const baseLinks = [
 
 function roleLinks(user) {
   if (!user) return [];
+  if (user.status === "suspended") {
+    return [{ label: "Status Akun", href: "/suspended" }];
+  }
   if (user.role === "member") {
     return [
       { label: "Dashboard", href: "/dashboard" },
@@ -33,6 +36,7 @@ function roleLinks(user) {
 
 function homeOfUser(user) {
   if (!user) return "/home";
+  if (user.status === "suspended") return "/suspended";
   if (user.role === "curator") {
     return user.status === "approved" ? "/dashboard/challenges" : "/pending";
   }
@@ -126,7 +130,9 @@ export default function Navbar() {
                       <div className="truncate text-[14px] font-semibold">{user.name}</div>
                       <div className="label mt-1.5 text-muted">
                         {user.role === "member" ? "Member" : user.role === "curator" ? "Kurator" : "Admin"}
-                        {user.role === "curator" ? ` · ${user.status}` : ""}
+                        {user.role === "curator"
+                          ? ` · ${user.status === "approved" ? "Approved" : user.status === "pending" ? "Pending" : user.status === "suspended" ? "Ditangguhkan" : "Rejected"}`
+                          : ""}
                       </div>
                     </div>
                     {roleLinks(user).map((link) => (
