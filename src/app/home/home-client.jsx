@@ -45,6 +45,7 @@ export default function HomeClient({
     });
     return list;
   }, [artworks, users, query, categoryId, sort]);
+  const visibleArtworks = filteredArtworks.slice(0, 6);
 
   const sortedByLikes = useMemo(
     () => [...artworks].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0)),
@@ -258,13 +259,13 @@ export default function HomeClient({
         </div>
 
         <p className="label mt-6 text-ink/65">
-          <span className="font-semibold text-ink/80">{filteredArtworks.length}</span> karya ditemukan
+          Menampilkan <span className="font-semibold text-ink/80">{visibleArtworks.length}</span> dari {filteredArtworks.length} karya
           {query ? ` untuk “${query}”` : ""}
         </p>
 
-        {filteredArtworks.length ? (
-          <div className="mt-8 columns-1 gap-8 sm:columns-2 xl:columns-3">
-            {filteredArtworks.map((artwork, index) => (
+        {visibleArtworks.length ? (
+          <div className="mt-8 grid gap-x-8 gap-y-12 sm:grid-cols-2 xl:grid-cols-3">
+            {visibleArtworks.map((artwork, index) => (
               <ArtworkCard
                 key={artwork.id}
                 artwork={artwork}
@@ -284,6 +285,9 @@ export default function HomeClient({
             <button type="button" onClick={resetFilters} className="btn btn-outline btn-sm mt-5">Reset filter</button>
           </div>
         )}
+        <div className="mt-12 flex justify-center">
+          <Link href="/gallery" className="btn btn-outline">Jelajahi Galeri</Link>
+        </div>
       </section>
 
       <section className="mx-auto max-w-[1240px] px-5 pb-16 lg:px-10 lg:pb-24">

@@ -13,14 +13,6 @@ export default function Footer() {
     router.push("/home");
   }
 
-  function handleReset() {
-    window.localStorage.removeItem("desrefuses_db_v2");
-    window.localStorage.removeItem("desrefuses_db_v1");
-    logout();
-    router.push("/home");
-    router.refresh();
-  }
-
   return (
     <footer className="overflow-hidden bg-ink text-paper">
       <div className="mx-auto max-w-[1240px] px-5 pb-0 pt-12 lg:px-10">
@@ -39,7 +31,6 @@ export default function Footer() {
             <div className="flex flex-col gap-3 font-label text-[13px] uppercase tracking-normal text-paper/60">
               <Link href="/gallery" className="hover:text-acid">Jelajahi</Link>
               <Link href="/challenges" className="hover:text-acid">Tantangan</Link>
-              <Link href="/home#manifesto" className="hover:text-acid">Manifesto</Link>
             </div>
           </div>
           <div>
@@ -73,11 +64,8 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="flex flex-col justify-between gap-3 py-5 font-label text-[12px] uppercase tracking-normal text-paper/50 sm:flex-row">
+        <div className="py-5 font-label text-[12px] uppercase tracking-normal text-paper/50">
           <span>© 2026 desRefusés — Unjuried since 1863</span>
-          <button type="button" onClick={handleReset} className="transition-colors hover:text-acid">
-            Reset data demo
-          </button>
         </div>
       </div>
     </footer>

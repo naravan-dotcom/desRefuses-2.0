@@ -27,7 +27,7 @@ export default function ArtworkCard({
   const hasAiTag = Array.isArray(artwork?.tags) && artwork.tags.some((t) => String(t).toLowerCase() === "ai");
 
   return (
-    <article className="art-card group break-inside-avoid mb-10">
+    <article className="art-card group">
       <Link href={`/artwork/${artwork.id}`} className="block">
         <div className="art-media relative aspect-[4/5]">
           <img

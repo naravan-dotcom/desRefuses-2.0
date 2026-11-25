@@ -199,9 +199,9 @@ export default function DashboardFavoritesPage() {
           Memuat favorit...
         </div>
       ) : visibleArtworks.length ? (
-        <div className="columns-1 gap-8 sm:columns-2 xl:columns-3">
+        <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2 xl:grid-cols-3">
           {visibleArtworks.map((artwork, index) => (
-            <div key={artwork.id} className="mb-8 break-inside-avoid">
+            <div key={artwork.id} className="flex flex-col">
               <ArtworkCard
                 artwork={artwork}
                 creator={creators[String(artwork.userId)] ?? "Kreator"}
@@ -209,7 +209,7 @@ export default function DashboardFavoritesPage() {
                 commentCount={0}
                 index={index}
               />
-              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2.5">
                 <span className="label text-ink/50">{artCode(artwork.id)}</span>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setShowAddTo(artwork)} className="btn btn-outline btn-sm">

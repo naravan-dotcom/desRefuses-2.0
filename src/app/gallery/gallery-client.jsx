@@ -67,7 +67,7 @@ export default function GalleryClient({ categories, artworks, creators, category
         </p>
 
         {filtered.length ? (
-          <div className="mt-8 columns-1 gap-8 sm:columns-2 xl:columns-3">
+          <div className="mt-8 grid gap-x-8 gap-y-12 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((artwork, index) => (
               <ArtworkCard
                 key={artwork.id}
