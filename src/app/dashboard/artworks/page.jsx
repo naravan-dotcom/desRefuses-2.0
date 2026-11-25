@@ -5,10 +5,9 @@ import ConfirmDialog from "@/components/ui/confirm-dialog";
 import ErrorBanner from "@/components/ui/error-banner";
 import Modal from "@/components/ui/modal";
 import ModalActions from "@/components/ui/modal-actions";
-import StatusBadge from "@/components/ui/status-badge";
 import { notify } from "@/components/ui/toast";
 import useErrorNotify from "@/hooks/use-error-notify";
-import { formDataWithFile } from "@/lib/form-data";
+import { entriesToFormData, formDataWithFile } from "@/lib/form-data";
 import { IMAGE_ACCEPT } from "@/lib/upload";
 import { createArtwork, deleteArtwork, listArtworkPageData, updateArtwork } from "./actions";
 
@@ -79,8 +78,6 @@ export default function DashboardArtworksPage() {
       description: artwork.description,
       categoryId: artwork.categoryId,
       tags: Array.isArray(artwork.tags) ? artwork.tags.join(", ") : "",
-      image: artwork.image,
-      imageFile: null,
     });
     setError("");
     setShowEdit(true);
@@ -90,17 +87,13 @@ export default function DashboardArtworksPage() {
     if (!editing) return;
     setError("");
     const result = await updateArtwork(
-      formDataWithFile(
-        {
-          id: editing.id,
-          title: editing.title,
-          description: editing.description,
-          categoryId: editing.categoryId,
-          tags: editing.tags,
-          existingImage: editing.image,
-        },
-        editing.imageFile,
-      ),
+      entriesToFormData({
+        id: editing.id,
+        title: editing.title,
+        description: editing.description,
+        categoryId: editing.categoryId,
+        tags: editing.tags,
+      }),
     );
     if (!result.ok) {
       setError(result.error);
@@ -309,27 +302,7 @@ export default function DashboardArtworksPage() {
       >
         {editing && (
           <div className="grid gap-5 sm:grid-cols-12">
-            <div className="sm:col-span-5">
-              <label htmlFor="edit-artwork-image" className="label">Ganti gambar</label>
-              <label
-                htmlFor="edit-artwork-image"
-                className="art-media mt-2 flex aspect-[10/7] cursor-pointer items-center justify-center border border-dashed border-ink/25 transition-colors hover:border-ink/60"
-              >
-                <img src={editing.image} alt="" className="art-img absolute inset-0 h-full w-full object-cover" />
-                <StatusBadge className="status-approved relative">Klik untuk ganti</StatusBadge>
-                <input
-                  id="edit-artwork-image"
-                  type="file"
-                  accept={IMAGE_ACCEPT}
-                  onChange={(event) => setEditing({ ...editing, imageFile: event.target.files?.[0] ?? null })}
-                  className="sr-only"
-                />
-              </label>
-              <p className="mt-2 text-[12px] text-ink/50">
-                {editing.imageFile?.name ?? "Biarkan kosong untuk mempertahankan gambar saat ini."}
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:col-span-7">
+            <div className="flex flex-col gap-3 sm:col-span-12">
               <div>
                 <label htmlFor="edit-artwork-title" className="label">Judul karya</label>
                 <input

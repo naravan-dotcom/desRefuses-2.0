@@ -125,37 +125,21 @@ export async function updateArtwork(formData) {
   const description = value(formData, "description");
   const categoryId = Number(value(formData, "categoryId"));
   const tags = parseTags(formData.get("tags"));
-  const file = formData.get("image");
-  const existingImage = value(formData, "existingImage");
 
   if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "Karya tidak ditemukan." };
   if (!title || !description || !Number.isInteger(categoryId) || tags.length === 0) {
     return { ok: false, error: "Judul, deskripsi, kategori, dan minimal satu tag wajib diisi." };
   }
 
-  let image = existingImage;
-  let newImage = "";
-  if (file && typeof file !== "string" && file.size > 0) {
-    const imageCheck = validateImage(file);
-    if (imageCheck.error) return { ok: false, error: imageCheck.error };
-    image = await saveImage(file);
-    newImage = image;
-  }
-
   try {
     const { rows } = await pool.query(
-      "UPDATE artworks SET title = $1, description = $2, category_id = $3, tags = $4, image = $5 WHERE id = $6 AND user_id = $7 RETURNING *",
-      [title, description, categoryId, tags, image, id, access.dbId],
+      "UPDATE artworks SET title = $1, description = $2, category_id = $3, tags = $4 WHERE id = $5 AND user_id = $6 RETURNING *",
+      [title, description, categoryId, tags, id, access.dbId],
     );
-    if (!rows.length) {
-      if (newImage) await removeImage(newImage);
-      return { ok: false, error: "Karya tidak ditemukan." };
-    }
-    if (newImage) await removeImage(existingImage);
+    if (!rows.length) return { ok: false, error: "Karya tidak ditemukan." };
     revalidateArtworks();
     return { ok: true, artwork: toArtwork(rows[0]) };
   } catch {
-    if (newImage) await removeImage(newImage);
     return { ok: false, error: "Karya gagal diperbarui." };
   }
 }
