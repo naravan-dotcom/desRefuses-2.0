@@ -3,8 +3,8 @@
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import AuthShell from "@/components/auth-shell";
-import { notify } from "@/components/toast";
+import AuthShell from "@/components/auth/auth-shell";
+import { notify } from "@/components/ui/toast";
 import { homeForUser } from "@/lib/access";
 
 const demoAccounts = [

@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import Modal from "@/components/ui/modal";
+import { notify } from "@/components/ui/toast";
+import { MAX_UPLOAD_SIZE } from "@/lib/upload";
 import { notifySessionChange } from "@/lib/use-session";
 import { updateProfile } from "./actions";
-
-const MAX_FILE_SIZE = 1024 * 1024;
 
 export default function DashboardProfileClient({ initialUser, initialFollowing }) {
   const [user, setUser] = useState(initialUser);
@@ -61,7 +60,7 @@ export default function DashboardProfileClient({ initialUser, initialFollowing }
       setError("File harus berupa gambar.");
       return;
     }
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > MAX_UPLOAD_SIZE) {
       setError("Ukuran gambar maksimal 1 MB.");
       return;
     }

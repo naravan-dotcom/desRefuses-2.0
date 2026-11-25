@@ -3,15 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import pool from "@/lib/db";
-const REPORT_REASONS = [
-  "Plagiat",
-  "SARA",
-  "Konten tidak pantas",
-  "Perundungan",
-  "Spam",
-  "Lainnya",
-];
 import { toComment } from "@/lib/db-shape";
+import { REPORT_REASONS } from "@/lib/seed";
 
 function value(formData, key) {
   return String(formData.get(key) ?? "").trim();

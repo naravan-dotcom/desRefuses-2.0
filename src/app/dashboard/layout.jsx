@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import DashboardShell from "@/components/dashboard/dashboard-shell";
 import DashboardNav, { canOpen } from "@/components/dashboard/dashboard-nav";
+import SessionLoading from "@/components/ui/session-loading";
 import { useSession } from "@/lib/use-session";
 
 export default function DashboardLayout({ children }) {
@@ -20,7 +21,7 @@ export default function DashboardLayout({ children }) {
   if (!allowed) {
     return (
       <div className="page-enter grid min-h-[60vh] place-items-center px-5">
-        <p className="label text-ink/55">Memeriksa sesi...</p>
+        <SessionLoading />
       </div>
     );
   }

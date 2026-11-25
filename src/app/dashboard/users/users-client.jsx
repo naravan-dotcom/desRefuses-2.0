@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import Modal from "@/components/ui/modal";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
+import { entriesToFormData } from "@/lib/form-data";
 import { deleteUser, listUserAdminData, updateUserStatus } from "../actions";
 
 const filters = ["Semua", "Admin", "Member", "Curator"];
@@ -21,12 +23,6 @@ function statusInfo(status) {
   if (status === "suspended") return { label: "Ditangguhkan", className: "status-suspended" };
   if (status === "pending") return { label: "Pending", className: "status-pending" };
   return { label: "Aktif", className: "status-approved" };
-}
-
-function formWith(entries) {
-  const formData = new FormData();
-  Object.entries(entries).forEach(([key, value]) => formData.set(key, String(value ?? "")));
-  return formData;
 }
 
 export default function DashboardUsersClient({ initialUsers, currentDbId }) {
@@ -55,7 +51,7 @@ export default function DashboardUsersClient({ initialUsers, currentDbId }) {
 
   async function removeUser() {
     setError("");
-    const result = await deleteUser(formWith({ id: confirmingId }));
+    const result = await deleteUser(entriesToFormData({ id: confirmingId }));
     setConfirmingId(null);
     if (!result.ok) {
       setError(result.error);
@@ -69,7 +65,7 @@ export default function DashboardUsersClient({ initialUsers, currentDbId }) {
     if (!suspendTarget || !reason.trim()) return;
     setError("");
     const result = await updateUserStatus(
-      formWith({ id: suspendTarget.dbId, status: "suspended", reason: reason.trim() }),
+      entriesToFormData({ id: suspendTarget.dbId, status: "suspended", reason: reason.trim() }),
     );
     setSuspendTarget(null);
     setReason("");
@@ -83,7 +79,7 @@ export default function DashboardUsersClient({ initialUsers, currentDbId }) {
 
   async function restoreUser(item) {
     setError("");
-    const result = await updateUserStatus(formWith({ id: item.dbId, status: "approved", reason: "" }));
+    const result = await updateUserStatus(entriesToFormData({ id: item.dbId, status: "approved", reason: "" }));
     if (!result.ok) {
       setError(result.error);
       return;
@@ -179,7 +175,7 @@ export default function DashboardUsersClient({ initialUsers, currentDbId }) {
                         </span>
                       </td>
                       <td>
-                        <span className={`status ${info.className}`}>{info.label}</span>
+                        <StatusBadge className={info.className}>{info.label}</StatusBadge>
                       </td>
                       <td className="text-ink/70">{item.email}</td>
                       <td className="text-ink/65">{formatDate(item.joinedAt)}</td>

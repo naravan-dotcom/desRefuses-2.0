@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import ErrorBanner from "@/components/ui/error-banner";
+import Modal from "@/components/ui/modal";
+import ModalActions from "@/components/ui/modal-actions";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
+import useErrorNotify from "@/hooks/use-error-notify";
+import { formDataWithFile } from "@/lib/form-data";
+import { IMAGE_ACCEPT } from "@/lib/upload";
 import { createArtwork, deleteArtwork, listArtworkPageData, updateArtwork } from "./actions";
 
 function artCode(id) {
@@ -45,22 +51,13 @@ export default function DashboardArtworksPage() {
     void Promise.resolve().then(refresh);
   }, []);
 
-  useEffect(() => {
-    if (error) notify(error, "error");
-  }, [error]);
-
-  function buildForm(values, file) {
-    const formData = new FormData();
-    Object.entries(values).forEach(([key, value]) => formData.set(key, String(value ?? "")));
-    if (file) formData.set("image", file);
-    return formData;
-  }
+  useErrorNotify(error);
 
   async function addArtwork(event) {
     event.preventDefault();
     setError("");
     const result = await createArtwork(
-      buildForm({ title, description, categoryId, tags }, image),
+      formDataWithFile({ title, description, categoryId, tags }, image),
     );
     if (!result.ok) {
       setError(result.error);
@@ -93,7 +90,7 @@ export default function DashboardArtworksPage() {
     if (!editing) return;
     setError("");
     const result = await updateArtwork(
-      buildForm(
+      formDataWithFile(
         {
           id: editing.id,
           title: editing.title,
@@ -119,7 +116,7 @@ export default function DashboardArtworksPage() {
     setError("");
     const id = deletingId;
     setDeletingId(null);
-    const result = await deleteArtwork(buildForm({ id }));
+    const result = await deleteArtwork(formDataWithFile({ id }));
     if (!result.ok) {
       setError(result.error);
       return;
@@ -164,7 +161,7 @@ export default function DashboardArtworksPage() {
               <input
                 id="artwork-image"
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept={IMAGE_ACCEPT}
                 onChange={(event) => setImage(event.target.files?.[0] ?? null)}
                 className="sr-only"
               />
@@ -229,11 +226,7 @@ export default function DashboardArtworksPage() {
         </div>
       </form>
 
-      {error && (
-        <p className="border-l-2 border-wine bg-wine/5 px-4 py-3 text-[13px] text-wine">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <div className="border hairline bg-white">
         <div className="flex items-center justify-between border-b hairline px-5 py-4">
@@ -323,11 +316,11 @@ export default function DashboardArtworksPage() {
                 className="art-media mt-2 flex aspect-[10/7] cursor-pointer items-center justify-center border border-dashed border-ink/25 transition-colors hover:border-ink/60"
               >
                 <img src={editing.image} alt="" className="art-img absolute inset-0 h-full w-full object-cover" />
-                <span className="status status-approved relative">Klik untuk ganti</span>
+                <StatusBadge className="status-approved relative">Klik untuk ganti</StatusBadge>
                 <input
                   id="edit-artwork-image"
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept={IMAGE_ACCEPT}
                   onChange={(event) => setEditing({ ...editing, imageFile: event.target.files?.[0] ?? null })}
                   className="sr-only"
                 />
@@ -382,7 +375,7 @@ export default function DashboardArtworksPage() {
             </div>
           </div>
         )}
-        <div className="mt-8 flex flex-wrap justify-end gap-2">
+        <ModalActions>
           <button
             type="button"
             onClick={() => {
@@ -396,7 +389,7 @@ export default function DashboardArtworksPage() {
           <button type="button" onClick={saveEdit} className="btn btn-ink btn-sm">
             Simpan perubahan
           </button>
-        </div>
+        </ModalActions>
       </Modal>
 
       <ConfirmDialog

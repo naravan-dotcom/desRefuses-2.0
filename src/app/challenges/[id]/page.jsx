@@ -1,4 +1,4 @@
-import Link from "next/link";
+import NotFoundState from "@/components/ui/not-found-state";
 import { auth } from "@/auth";
 import pool from "@/lib/db";
 import { toArtwork, toChallenge } from "@/lib/db-shape";
@@ -6,13 +6,12 @@ import ChallengeClient from "./challenge-client";
 
 function notFound() {
   return (
-    <main className="page-enter px-5 py-16 lg:px-10">
-      <div className="mx-auto max-w-3xl border border-dashed border-ink/20 p-10 text-center">
-        <i className="fa-regular fa-flag text-2xl text-ink/40" />
-        <h1 className="font-display mt-4 text-[28px]">Challenge tidak ditemukan.</h1>
-        <Link href="/challenges" className="btn btn-outline btn-sm mt-5">Kembali ke daftar challenge</Link>
-      </div>
-    </main>
+    <NotFoundState
+      icon="fa-regular fa-flag"
+      title="Challenge tidak ditemukan."
+      href="/challenges"
+      linkLabel="Kembali ke daftar challenge"
+    />
   );
 }
 

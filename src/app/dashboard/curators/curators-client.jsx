@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import Modal from "@/components/ui/modal";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
+import { entriesToFormData } from "@/lib/form-data";
 import { listCuratorAdminData, updateUserStatus } from "../actions";
 
 function formatDate(value) {
@@ -11,12 +13,6 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-}
-
-function formWith(entries) {
-  const formData = new FormData();
-  Object.entries(entries).forEach(([key, value]) => formData.set(key, String(value ?? "")));
-  return formData;
 }
 
 export default function DashboardCuratorsClient({ initialCurators }) {
@@ -41,7 +37,7 @@ export default function DashboardCuratorsClient({ initialCurators }) {
   async function decide(item, status, suspensionReason = "") {
     setError("");
     const result = await updateUserStatus(
-      formWith({ id: item.dbId, status, reason: suspensionReason.trim() }),
+      entriesToFormData({ id: item.dbId, status, reason: suspensionReason.trim() }),
     );
     setConfirmReject(null);
     setSuspendTarget(null);
@@ -71,7 +67,7 @@ export default function DashboardCuratorsClient({ initialCurators }) {
             Tinjau dan setujui pendaftaran akun kurator sebelum mereka dapat membuat challenge.
           </p>
         </div>
-        <span className="status status-pending">{pending.length} pending</span>
+        <StatusBadge className="status-pending">{pending.length} pending</StatusBadge>
       </header>
 
       {error && <div className="border hairline bg-white px-5 py-3 text-[13px] text-wine">{error}</div>}
@@ -108,7 +104,7 @@ export default function DashboardCuratorsClient({ initialCurators }) {
                         </p>
                       </div>
                     </div>
-                    <span className="status status-pending">Pending</span>
+                    <StatusBadge className="status-pending">Pending</StatusBadge>
                   </div>
                   <p className="mt-4 text-[14px] leading-relaxed text-ink/75">
                     {curator.bio || "Belum menyertakan bio."}
@@ -208,7 +204,7 @@ export default function DashboardCuratorsClient({ initialCurators }) {
                         </div>
                       </td>
                       <td>
-                        <span className={`status ${statusClass}`}>{statusLabel}</span>
+                        <StatusBadge className={statusClass}>{statusLabel}</StatusBadge>
                       </td>
                       <td className="max-w-[280px] text-[13px] text-ink/65">
                         {curator.status === "suspended" ? curator.suspensionReason || "—" : "—"}

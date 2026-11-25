@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import ArtworkCard from "@/components/artwork-card";
+import ArtworkCard from "@/components/artwork/artwork-card";
 
 export default function GalleryClient({ categories, artworks, creators, categoryNames, commentCounts }) {
   const [query, setQuery] = useState("");

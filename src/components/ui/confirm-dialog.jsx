@@ -1,6 +1,7 @@
 "use client";
 
-import Modal from "@/components/modal";
+import Modal from "./modal";
+import ModalActions from "./modal-actions";
 
 export default function ConfirmDialog({
   open,
@@ -16,12 +17,12 @@ export default function ConfirmDialog({
   return (
     <Modal open={open} onClose={onClose} title={title} subtitle={subtitle} maxWidth="max-w-md">
       <div className="text-[14px] leading-relaxed text-ink/65">{message}</div>
-      <div className="mt-8 flex flex-wrap justify-end gap-2">
+      <ModalActions>
         <button type="button" onClick={onClose} className="btn btn-outline btn-sm">{cancelLabel}</button>
         <button type="button" onClick={onConfirm} className={`btn btn-sm ${danger ? "btn-wine" : "btn-ink"}`}>
           {confirmLabel}
         </button>
-      </div>
+      </ModalActions>
     </Modal>
   );
 }

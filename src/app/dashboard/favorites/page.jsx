@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import ArtworkCard from "@/components/artwork-card";
-import ConfirmDialog from "@/components/confirm-dialog";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import ArtworkCard from "@/components/artwork/artwork-card";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import Modal from "@/components/ui/modal";
+import ModalActions from "@/components/ui/modal-actions";
+import { notify } from "@/components/ui/toast";
+import useErrorNotify from "@/hooks/use-error-notify";
 import { loadDb, saveDb, uid } from "@/lib/local-data";
 import { useSession } from "@/lib/use-session";
 import { listFavorites } from "./actions";
@@ -58,9 +60,7 @@ export default function DashboardFavoritesPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (error) notify(error, "error");
-  }, [error]);
+  useErrorNotify(error);
 
   function persistCollections(next) {
     const db = loadDb();
@@ -257,10 +257,10 @@ export default function DashboardFavoritesPage() {
           <p className="mt-2 text-[12px] leading-relaxed text-ink/55">
             Koleksi disimpan di perangkat ini. Favorit karya tetap tersimpan di akun Anda.
           </p>
-          <div className="mt-8 flex flex-wrap justify-end gap-2">
+          <ModalActions>
             <button type="button" onClick={() => setShowNew(false)} className="btn btn-outline btn-sm">Batal</button>
             <button type="submit" className="btn btn-ink btn-sm">Buat koleksi</button>
-          </div>
+          </ModalActions>
         </form>
       </Modal>
 

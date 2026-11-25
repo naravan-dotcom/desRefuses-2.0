@@ -2,9 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import Modal from "@/components/ui/modal";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
 import { buildForm } from "@/app/challenges/form-utils";
 import {
   formatDate,
@@ -13,6 +14,7 @@ import {
   statusClasses,
   statusLabels,
 } from "@/lib/challenge-status";
+import { IMAGE_ACCEPT, IMAGE_MIME_TYPES, MAX_UPLOAD_SIZE } from "@/lib/upload";
 import {
   createChallenge,
   deleteChallenge,
@@ -21,7 +23,6 @@ import {
   updateChallenge,
 } from "./actions";
 
-const MAX_FILE_SIZE = 1024 * 1024;
 const emptyForm = {
   title: "",
   description: "",
@@ -99,13 +100,13 @@ export default function DashboardChallengesClient({ initial, initialCreate = fal
       setBannerFile(null);
       return;
     }
-    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+    if (!IMAGE_MIME_TYPES.includes(file.type)) {
       setBannerFile(null);
       setError("Banner harus berupa JPG, PNG, WEBP, atau GIF.");
       notify("Banner harus berupa JPG, PNG, WEBP, atau GIF.", "error");
       return;
     }
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > MAX_UPLOAD_SIZE) {
       setBannerFile(null);
       setError("Ukuran banner maksimal 1 MB.");
       notify("Ukuran banner maksimal 1 MB.", "error");
@@ -370,7 +371,7 @@ export default function DashboardChallengesClient({ initial, initialCreate = fal
             <span className="label">Banner challenge</span>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept={IMAGE_ACCEPT}
               onChange={pickBanner}
               className="field mt-2"
             />
@@ -435,7 +436,7 @@ export default function DashboardChallengesClient({ initial, initialCreate = fal
                           </div>
                         </div>
                       </td>
-                      <td><span className={`status ${statusClasses[status]}`}>{statusLabels[status]}</span></td>
+                      <td><StatusBadge className={statusClasses[status]}>{statusLabels[status]}</StatusBadge></td>
                       <td className="text-ink/65">{challenge.submissionCount}</td>
                       <td className="text-ink/65">
                         {formatDate(challenge.startDate)} — {formatDate(challenge.endDate)}
@@ -481,9 +482,9 @@ export default function DashboardChallengesClient({ initial, initialCreate = fal
             <div className="flex flex-wrap items-center justify-between gap-3 border-b hairline pb-5">
               <p className="text-[14px] text-ink/65">{selected.title}</p>
               <div className="flex items-center gap-3">
-                <span className={`status ${statusClasses[getChallengeStatus(selected, today)]}`}>
+                <StatusBadge className={statusClasses[getChallengeStatus(selected, today)]}>
                   {statusLabels[getChallengeStatus(selected, today)]}
-                </span>
+                </StatusBadge>
                 <button type="button" onClick={closeManage} className="btn btn-outline btn-sm">Tutup</button>
               </div>
             </div>

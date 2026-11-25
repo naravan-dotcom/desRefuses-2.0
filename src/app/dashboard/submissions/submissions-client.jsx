@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
-import { notify } from "@/components/toast";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
 import { withdrawSubmission } from "@/app/challenges/actions";
 import { buildForm } from "@/app/challenges/form-utils";
 import { formatDate, getChallengeStatus, statusClasses, statusLabels } from "@/lib/challenge-status";
@@ -103,10 +104,10 @@ export default function DashboardSubmissionsClient({ initial }) {
                           {item.artwork.title}
                         </Link>
                       </td>
-                      <td><span className={`status ${statusClasses[status]}`}>{statusLabels[status]}</span></td>
+                      <td><StatusBadge className={statusClasses[status]}>{statusLabels[status]}</StatusBadge></td>
                       <td>
                         {item.winnerLabel ? (
-                          <span className="status status-approved">{item.winnerLabel}</span>
+                          <StatusBadge className="status-approved">{item.winnerLabel}</StatusBadge>
                         ) : (
                           <span className="text-ink/45">—</span>
                         )}

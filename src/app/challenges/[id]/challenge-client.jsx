@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import ArtworkCard from "@/components/artwork-card";
-import { notify } from "@/components/toast";
+import ArtworkCard from "@/components/artwork/artwork-card";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
 import { buildForm } from "@/app/challenges/form-utils";
 import { formatDate, getChallengeStatus, statusClasses, statusLabels } from "@/lib/challenge-status";
 import { submitArtwork, withdrawSubmission } from "../actions";
@@ -175,7 +176,7 @@ export default function ChallengeClient({
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-5 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`status ${statusClasses[status]}`}>{statusLabels[status]}</span>
+              <StatusBadge className={statusClasses[status]}>{statusLabels[status]}</StatusBadge>
               <span className="label text-paper/60">oleh {curator.name}</span>
             </div>
             <h1 className="font-display mt-2 max-w-3xl text-3xl font-bold leading-[1.03] text-paper sm:text-5xl">
@@ -293,7 +294,7 @@ export default function ChallengeClient({
                   </div>
                   <div className="flex items-start justify-between gap-3 px-4 py-2.5">
                     <span className="label pt-0.5 text-ink/65">Status</span>
-                    <span className={`status ${statusClasses[status]}`}>{statusLabels[status]}</span>
+                    <StatusBadge className={statusClasses[status]}>{statusLabels[status]}</StatusBadge>
                   </div>
                 </div>
               </div>

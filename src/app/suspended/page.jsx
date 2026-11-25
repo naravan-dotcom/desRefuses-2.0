@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import SessionLoading from "@/components/ui/session-loading";
+import StatusBadge from "@/components/ui/status-badge";
 import { logout, useSession } from "@/lib/use-session";
 
 const ADMIN_EMAIL = "admin@desrefuses.id";
@@ -28,7 +30,7 @@ export default function SuspendedPage() {
   if (!ready || !user || user.status !== "suspended") {
     return (
       <main className="page-enter grid min-h-[60vh] place-items-center px-5">
-        <p className="label text-ink/55">Memeriksa sesi...</p>
+        <SessionLoading />
       </main>
     );
   }
@@ -46,7 +48,7 @@ export default function SuspendedPage() {
                 Akun Anda ditangguhkan.
               </h1>
             </div>
-            <span className="status status-suspended">Ditangguhkan</span>
+            <StatusBadge className="status-suspended">Ditangguhkan</StatusBadge>
           </div>
           <p className="mt-4 text-[16px] leading-relaxed text-ink/80">
             Admin menangguhkan akun Anda. Anda tidak dapat mengakses dashboard maupun fitur interaksi sampai akun diaktifkan kembali.

@@ -8,14 +8,7 @@ import { auth } from "@/auth";
 import pool from "@/lib/db";
 import { toArtwork, toCategory } from "@/lib/db-shape";
 import { listCategories } from "@/app/dashboard/categories/actions";
-
-const MAX_FILE_SIZE = 1024 * 1024;
-const EXTENSIONS = {
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-  "image/gif": ".gif",
-};
+import { IMAGE_EXTENSIONS, MAX_UPLOAD_SIZE } from "@/lib/upload";
 
 function value(formData, key) {
   return String(formData.get(key) ?? "").trim();
@@ -25,17 +18,17 @@ function validateImage(file) {
   if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
     return { error: "Pilih file gambar terlebih dahulu." };
   }
-  if (!Object.keys(EXTENSIONS).includes(String(file.type))) {
+  if (!Object.keys(IMAGE_EXTENSIONS).includes(String(file.type))) {
     return { error: "File harus berupa JPG, PNG, WEBP, atau GIF." };
   }
-  if (file.size > MAX_FILE_SIZE) {
+  if (file.size > MAX_UPLOAD_SIZE) {
     return { error: "Ukuran gambar maksimal 1 MB." };
   }
   return { ok: true };
 }
 
 async function saveImage(file) {
-  const filename = `${randomUUID()}${EXTENSIONS[file.type]}`;
+  const filename = `${randomUUID()}${IMAGE_EXTENSIONS[file.type]}`;
   const directory = join(process.cwd(), "public", "uploads", "art");
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, filename), Buffer.from(await file.arrayBuffer()));

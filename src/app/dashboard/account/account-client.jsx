@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import Modal from "@/components/ui/modal";
+import { notify } from "@/components/ui/toast";
 import { notifySessionChange } from "@/lib/use-session";
 import { updateAccount } from "./actions";
 

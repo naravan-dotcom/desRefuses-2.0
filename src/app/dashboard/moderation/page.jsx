@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import Modal from "@/components/ui/modal";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
+import useErrorNotify from "@/hooks/use-error-notify";
+import { entriesToFormData } from "@/lib/form-data";
 import { dismissReport, listModerationGroups, takeDown } from "./actions";
 
 function artCode(id) {
@@ -23,13 +26,6 @@ function timeId(value) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function buildForm(type, targetId) {
-  const formData = new FormData();
-  formData.set("type", type);
-  formData.set("targetId", String(targetId));
-  return formData;
 }
 
 export default function DashboardModerationPage() {
@@ -56,9 +52,7 @@ export default function DashboardModerationPage() {
     void Promise.resolve().then(refresh);
   }, []);
 
-  useEffect(() => {
-    if (error) notify(error, "error");
-  }, [error]);
+  useErrorNotify(error);
 
   const artworkCount = groups.filter((group) => group.type === "artwork").length;
   const commentCount = groups.filter((group) => group.type === "comment").length;
@@ -67,7 +61,7 @@ export default function DashboardModerationPage() {
   const mostReported = [...groups].sort((a, b) => b.reports.length - a.reports.length)[0];
 
   async function dismiss(group) {
-    const result = await dismissReport(buildForm(group.type, group.targetId));
+    const result = await dismissReport(entriesToFormData({ type: group.type, targetId: group.targetId }));
     if (!result.ok) {
       setError(result.error);
       return;
@@ -82,7 +76,7 @@ export default function DashboardModerationPage() {
     if (!group) return;
     setTakedownGroup(null);
     setActiveGroup(null);
-    const result = await takeDown(buildForm(group.type, group.targetId));
+    const result = await takeDown(entriesToFormData({ type: group.type, targetId: group.targetId }));
     if (!result.ok) {
       setError(result.error);
       return;
@@ -159,7 +153,7 @@ export default function DashboardModerationPage() {
                     <img src={preview?.image} alt="" className="h-16 w-20 shrink-0 object-cover" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="status status-pending">{group.type === "artwork" ? "Karya" : "Komentar"}</span>
+                        <StatusBadge className="status-pending">{group.type === "artwork" ? "Karya" : "Komentar"}</StatusBadge>
                         <span className="label text-ink/45">{artCode(group.targetId)}</span>
                       </div>
                       <h3 className="font-display mt-2 truncate text-[20px] leading-tight">
@@ -244,7 +238,7 @@ export default function DashboardModerationPage() {
             </div>
             <div className="sm:col-span-7">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="status status-pending">{activeGroup.type === "artwork" ? "Karya" : "Komentar"}</span>
+                <StatusBadge className="status-pending">{activeGroup.type === "artwork" ? "Karya" : "Komentar"}</StatusBadge>
                 <span className="label text-ink/45">{artCode(activeGroup.targetId)}</span>
               </div>
               <h3 className="font-display mt-3 text-[26px] leading-tight">

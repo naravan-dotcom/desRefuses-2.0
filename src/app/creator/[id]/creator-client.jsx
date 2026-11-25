@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import ArtworkCard from "@/components/artwork-card";
+import ArtworkCard from "@/components/artwork/artwork-card";
+import StatusBadge from "@/components/ui/status-badge";
 import { getSessionId } from "@/lib/auth-client";
 import { loadDb, saveDb } from "@/lib/local-data";
 import { useSession } from "@/lib/use-session";
@@ -82,9 +83,9 @@ export default function CreatorClient({ creator, artworks, categoryNames }) {
               <h1 className="font-display mt-4 text-[42px] leading-[1.06] sm:text-[58px]">{creator.name}</h1>
               <p className="mt-2 text-[15px] text-ink/60">@{creator.username}</p>
               {creator.status && creator.role === "curator" && (
-                <span className={`status mt-4 ${creator.status === "approved" ? "status-approved" : creator.status === "pending" ? "status-pending" : "status-rejected"}`}>
+                <StatusBadge className={`mt-4 ${creator.status === "approved" ? "status-approved" : creator.status === "pending" ? "status-pending" : "status-rejected"}`}>
                   Kurator {creator.status === "approved" ? "Approved" : creator.status === "pending" ? "Pending" : "Rejected"}
-                </span>
+                </StatusBadge>
               )}
               {creator.bio && <p className="mt-6 max-w-2xl text-[15px] leading-[1.8] text-ink/70">{creator.bio}</p>}
               {user && !isSelf && user.role === "member" && (

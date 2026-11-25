@@ -1,7 +1,7 @@
 import "./globals.css";
-import SessionProviderClient from "@/components/session-provider";
-import SiteShell from "@/components/site-shell";
-import ToastContainer from "@/components/toast";
+import SessionProviderClient from "@/components/auth/session-provider";
+import SiteShell from "@/components/shell/site-shell";
+import ToastContainer from "@/components/ui/toast";
 
 export const metadata = {
   title: "desRefusés 2.0 — Salon Tanpa Juri",

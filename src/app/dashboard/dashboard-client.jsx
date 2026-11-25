@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { notify } from "@/components/toast";
+import SectionHeaderLink from "@/components/ui/section-header-link";
+import StatusBadge from "@/components/ui/status-badge";
+import { notify } from "@/components/ui/toast";
 import { getChallengeStatus } from "@/lib/challenge-status";
 import { updateUserStatus } from "./actions";
 
@@ -126,15 +128,12 @@ export default function DashboardClient({ data }) {
       {user.role === "admin" && (
         <section className="grid gap-6 lg:grid-cols-2">
           <div className="border hairline bg-white p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="label text-ink/60">Antrean verifikasi</p>
-                <h2 className="font-display mt-2 text-2xl leading-none">Kurator pending</h2>
-              </div>
-              <Link href="/dashboard/curators" className="label text-wine hover:text-ink">
-                Semua <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
-              </Link>
-            </div>
+            <SectionHeaderLink
+              label="Antrean verifikasi"
+              title="Kurator pending"
+              href="/dashboard/curators"
+              linkLabel="Semua"
+            />
             <div className="mt-5 space-y-3">
               {pendingCurators.length === 0 ? (
                 <p className="border-t hairline pt-4 text-[14px] text-ink/55">
@@ -164,15 +163,12 @@ export default function DashboardClient({ data }) {
           </div>
 
           <div className="border hairline bg-white p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="label text-ink/60">Antrean moderasi</p>
-                <h2 className="font-display mt-2 text-2xl leading-none">Laporan terbuka</h2>
-              </div>
-              <Link href="/dashboard/moderation" className="label text-wine hover:text-ink">
-                Semua <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
-              </Link>
-            </div>
+            <SectionHeaderLink
+              label="Antrean moderasi"
+              title="Laporan terbuka"
+              href="/dashboard/moderation"
+              linkLabel="Semua"
+            />
             <div className="mt-5 space-y-3">
               {openReports.length === 0 ? (
                 <p className="border-t hairline pt-4 text-[14px] text-ink/55">
@@ -189,7 +185,7 @@ export default function DashboardClient({ data }) {
                         {report.type === "artwork" ? "Karya" : "Komentar"} · Pelapor: {report.reporterName}
                       </p>
                     </div>
-                    <span className="status status-pending shrink-0">Open</span>
+                    <StatusBadge className="status-pending shrink-0">Open</StatusBadge>
                   </div>
                 ))
               )}
@@ -200,15 +196,12 @@ export default function DashboardClient({ data }) {
 
       {user.role === "member" && (
         <section className="border hairline bg-white p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="label text-ink/60">Portofolio</p>
-              <h2 className="font-display mt-2 text-2xl leading-none">Karya terbaru</h2>
-            </div>
-            <Link href="/dashboard/artworks" className="label text-wine hover:text-ink">
-              Kelola karya <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
-            </Link>
-          </div>
+          <SectionHeaderLink
+            label="Portofolio"
+            title="Karya terbaru"
+            href="/dashboard/artworks"
+            linkLabel="Kelola karya"
+          />
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {member.recentArtworks.length ? (
               member.recentArtworks.map((item) => (
@@ -238,15 +231,12 @@ export default function DashboardClient({ data }) {
 
       {user.role === "curator" && (
         <section className="border hairline bg-white p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="label text-ink/60">Event Anda</p>
-              <h2 className="font-display mt-2 text-2xl leading-none">Challenge terbaru</h2>
-            </div>
-            <Link href="/dashboard/challenges" className="label text-wine hover:text-ink">
-              Semua <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
-            </Link>
-          </div>
+          <SectionHeaderLink
+            label="Event Anda"
+            title="Challenge terbaru"
+            href="/dashboard/challenges"
+            linkLabel="Semua"
+          />
           <div className="mt-5 space-y-3">
             {curator.recentChallenges.length ? (
               curator.recentChallenges.map((item) => {
@@ -266,7 +256,7 @@ export default function DashboardClient({ data }) {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-semibold">{item.title}</p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <span className={`status ${statusClass}`}>{statusText}</span>
+                        <StatusBadge className={statusClass}>{statusText}</StatusBadge>
                         <span className="label text-ink/55">{item.submissionCount} submisi</span>
                       </div>
                     </div>

@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import SessionLoading from "@/components/ui/session-loading";
+import StatusBadge from "@/components/ui/status-badge";
 import { deleteOwnAccount } from "./actions";
 import { logout, useSession } from "@/lib/use-session";
 
@@ -73,9 +75,9 @@ export default function PendingCuratorPage() {
                 {rejected ? "Pendaftaran ditolak." : "Akun Anda sedang ditinjau."}
               </h1>
             </div>
-            <span className={`status ${rejected ? "status-rejected" : "status-pending"}`}>
+            <StatusBadge className={rejected ? "status-rejected" : "status-pending"}>
               {rejected ? "Rejected" : "Pending"}
-            </span>
+            </StatusBadge>
           </div>
           <p className="mt-4 text-[16px] leading-relaxed text-ink/80">{description}</p>
         </div>

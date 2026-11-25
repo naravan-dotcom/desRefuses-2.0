@@ -7,8 +7,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import pool from "@/lib/db";
 import { toUser } from "@/lib/db-shape";
-
-const MAX_FILE_SIZE = 1024 * 1024;
+import { MAX_UPLOAD_SIZE } from "@/lib/upload";
 
 function value(formData, key) {
   return String(formData.get(key) ?? "").trim();
@@ -102,7 +101,7 @@ export async function updateProfile(formData) {
   const hasFile = avatarFile instanceof File && avatarFile.size > 0;
   if (hasFile) {
     if (!avatarFile.type.startsWith("image/")) return { ok: false, error: "File harus berupa gambar." };
-    if (avatarFile.size > MAX_FILE_SIZE) return { ok: false, error: "Ukuran gambar maksimal 1 MB." };
+    if (avatarFile.size > MAX_UPLOAD_SIZE) return { ok: false, error: "Ukuran gambar maksimal 1 MB." };
   }
   if (avatarUrl && !isValidUrl(avatarUrl)) return { ok: false, error: "URL foto profil tidak valid." };
 

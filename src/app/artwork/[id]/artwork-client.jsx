@@ -3,14 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-const REPORT_REASONS = [
-  "Plagiat",
-  "SARA",
-  "Konten tidak pantas",
-  "Perundungan",
-  "Spam",
-  "Lainnya",
-];
+import StatusBadge from "@/components/ui/status-badge";
+import { REPORT_REASONS } from "@/lib/seed";
+import { entriesToFormData } from "@/lib/form-data";
 import { addComment, deleteComment, submitReport, toggleFavorite, toggleLike } from "./actions";
 
 const months = [
@@ -63,18 +58,12 @@ export default function ArtworkClient({
 
   const isMember = user?.role === "member";
 
-  function buildForm(entries) {
-    const formData = new FormData();
-    Object.entries(entries).forEach(([key, value]) => formData.set(key, String(value ?? "")));
-    return formData;
-  }
-
   async function handleLike() {
     if (!isMember) {
       setNotice("Masuk sebagai Member untuk melakukan ini.");
       return;
     }
-    const result = await toggleLike(buildForm({ artworkId: artwork.id }));
+    const result = await toggleLike(entriesToFormData({ artworkId: artwork.id }));
     if (!result.ok) {
       setNotice(result.error);
       return;
@@ -90,7 +79,7 @@ export default function ArtworkClient({
       setNotice("Masuk sebagai Member untuk melakukan ini.");
       return;
     }
-    const result = await toggleFavorite(buildForm({ artworkId: artwork.id }));
+    const result = await toggleFavorite(entriesToFormData({ artworkId: artwork.id }));
     if (!result.ok) {
       setNotice(result.error);
       return;
@@ -111,7 +100,7 @@ export default function ArtworkClient({
       setNotice("Komentar tidak boleh kosong.");
       return;
     }
-    const result = await addComment(buildForm({ artworkId: artwork.id, text }));
+    const result = await addComment(entriesToFormData({ artworkId: artwork.id, text }));
     if (!result.ok) {
       setNotice(result.error);
       return;
@@ -124,7 +113,7 @@ export default function ArtworkClient({
 
   async function handleDeleteComment(commentId) {
     if (!window.confirm("Hapus komentar ini?")) return;
-    const result = await deleteComment(buildForm({ id: commentId }));
+    const result = await deleteComment(entriesToFormData({ id: commentId }));
     if (!result.ok) {
       setNotice(result.error);
       return;
@@ -157,7 +146,7 @@ export default function ArtworkClient({
     event.preventDefault();
     if (!report || !isMember) return;
     const result = await submitReport(
-      buildForm({ type: report.type, targetId: report.targetId, reason, detail: reportDetail }),
+      entriesToFormData({ type: report.type, targetId: report.targetId, reason, detail: reportDetail }),
     );
     if (!result.ok) {
       setNotice(result.error);
@@ -299,7 +288,7 @@ export default function ArtworkClient({
                           <p className="label mt-0.5 text-ink/50">{new Date(comment.createdAt).toLocaleDateString("id-ID")}</p>
                         </div>
                       </div>
-                      {own && <span className="status status-approved">Komentar Anda</span>}
+                      {own && <StatusBadge className="status-approved">Komentar Anda</StatusBadge>}
                     </div>
                     <p className="mt-4 text-[15px] leading-relaxed text-ink/70">{comment.text}</p>
                     <div className="mt-4 flex gap-5 border-t hairline pt-3">

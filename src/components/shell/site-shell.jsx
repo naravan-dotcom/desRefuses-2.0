@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Navbar from "@/components/navbar";
-import Footer from "@/components/footer";
-import PageProgress from "@/components/page-progress";
+import Navbar from "./navbar";
+import Footer from "./footer";
+import PageProgress from "./page-progress";
 import { useSession } from "@/lib/use-session";
 
 export default function SiteShell({ children }) {

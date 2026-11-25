@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ConfirmDialog from "@/components/confirm-dialog";
-import Modal from "@/components/modal";
-import { notify } from "@/components/toast";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
+import ErrorBanner from "@/components/ui/error-banner";
+import Modal from "@/components/ui/modal";
+import ModalActions from "@/components/ui/modal-actions";
+import { notify } from "@/components/ui/toast";
+import useErrorNotify from "@/hooks/use-error-notify";
+import { entriesToFormData } from "@/lib/form-data";
 import { createCategory, deleteCategory, listCategoryAdminData, updateCategory } from "./actions";
 
 export default function DashboardCategoriesPage() {
@@ -30,20 +34,12 @@ export default function DashboardCategoriesPage() {
     void Promise.resolve().then(refresh);
   }, []);
 
-  useEffect(() => {
-    if (error) notify(error, "error");
-  }, [error]);
-
-  function formWith(entries) {
-    const formData = new FormData();
-    Object.entries(entries).forEach(([key, value]) => formData.set(key, String(value ?? "")));
-    return formData;
-  }
+  useErrorNotify(error);
 
   async function addCategory(event) {
     event.preventDefault();
     setError("");
-    const result = await createCategory(formWith({ name }));
+    const result = await createCategory(entriesToFormData({ name }));
     if (!result.ok) {
       setError(result.error);
       return;
@@ -62,7 +58,7 @@ export default function DashboardCategoriesPage() {
 
   async function saveEdit() {
     setError("");
-    const result = await updateCategory(formWith({ id: editingId, name: editName }));
+    const result = await updateCategory(entriesToFormData({ id: editingId, name: editName }));
     if (!result.ok) {
       setError(result.error);
       return;
@@ -77,7 +73,7 @@ export default function DashboardCategoriesPage() {
     setError("");
     const id = deletingId;
     setDeletingId(null);
-    const result = await deleteCategory(formWith({ id }));
+    const result = await deleteCategory(entriesToFormData({ id }));
     if (!result.ok) {
       setError(result.error);
       return;
@@ -110,11 +106,7 @@ export default function DashboardCategoriesPage() {
         </button>
       </form>
 
-      {error && (
-        <p className="border-l-2 border-wine bg-wine/5 px-4 py-3 text-[13px] text-wine">
-          {error}
-        </p>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <div className="border hairline bg-white">
         <div className="flex items-center justify-between border-b hairline px-5 py-4">
@@ -199,7 +191,7 @@ export default function DashboardCategoriesPage() {
           onChange={(event) => setEditName(event.target.value)}
           className="field mt-2"
         />
-        <div className="mt-8 flex flex-wrap justify-end gap-2">
+        <ModalActions>
           <button
             type="button"
             onClick={() => setShowEdit(false)}
@@ -214,7 +206,7 @@ export default function DashboardCategoriesPage() {
           >
             Simpan
           </button>
-        </div>
+        </ModalActions>
       </Modal>
 
       <ConfirmDialog
