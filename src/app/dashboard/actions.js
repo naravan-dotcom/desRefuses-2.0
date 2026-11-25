@@ -23,6 +23,39 @@ async function requireAdmin() {
   return { dbId };
 }
 
+export async function listNavCounts() {
+  const session = await auth();
+  if (!session?.user || session.user.dbId == null) {
+    return { ok: false, error: "Sesi tidak ditemukan." };
+  }
+
+  const dbId = Number(session.user.dbId);
+  try {
+    const [artworks, favorites, submissions, challenges, pendingCurators, openReports] = await Promise.all([
+      pool.query("SELECT COUNT(*)::int AS total FROM artworks WHERE user_id = $1", [dbId]),
+      pool.query("SELECT COUNT(*)::int AS total FROM favorites WHERE member_id = $1", [dbId]),
+      pool.query("SELECT COUNT(*)::int AS total FROM submissions WHERE member_id = $1", [dbId]),
+      pool.query("SELECT COUNT(*)::int AS total FROM challenges WHERE curator_id = $1", [dbId]),
+      pool.query("SELECT COUNT(*)::int AS total FROM users WHERE role = 'curator' AND status = 'pending'"),
+      pool.query("SELECT COUNT(*)::int AS total FROM reports WHERE status = 'open'"),
+    ]);
+
+    return {
+      ok: true,
+      counts: {
+        artworks: Number(artworks.rows[0]?.total ?? 0),
+        favorites: Number(favorites.rows[0]?.total ?? 0),
+        submissions: Number(submissions.rows[0]?.total ?? 0),
+        challenges: Number(challenges.rows[0]?.total ?? 0),
+        pendingCurators: Number(pendingCurators.rows[0]?.total ?? 0),
+        openReports: Number(openReports.rows[0]?.total ?? 0),
+      },
+    };
+  } catch {
+    return { ok: false, error: "Jumlah data gagal dimuat." };
+  }
+}
+
 function revalidateAdmin() {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/users");

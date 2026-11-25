@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { loadDb } from "@/lib/local-data";
+import { listNavCounts } from "@/app/dashboard/actions";
 import { useSession } from "@/lib/use-session";
 
 const groups = [
@@ -66,19 +66,14 @@ export default function DashboardNav() {
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!user) return;
-      const db = loadDb();
-      setCounts({
-        artworks: db.artworks.filter((item) => item.userId === user.id).length,
-        favorites: (user.favorites ?? []).length,
-        submissions: db.submissions.filter((item) => item.userId === user.id).length,
-        challenges: db.challenges.filter((item) => item.curatorId === user.id).length,
-        pendingCurators: db.users.filter((item) => item.role === "curator" && item.status === "pending").length,
-        openReports: db.reports.filter((item) => item.status === "open").length,
-      });
-    }, 0);
-    return () => clearTimeout(timer);
+    let active = true;
+    if (!user) return () => {};
+    void listNavCounts().then((result) => {
+      if (active && result.ok) setCounts(result.counts);
+    });
+    return () => {
+      active = false;
+    };
   }, [user, pathname]);
 
   if (!user) return null;

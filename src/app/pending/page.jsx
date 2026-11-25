@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ConfirmDialog from "@/components/confirm-dialog";
-import { loadDb, saveDb } from "@/lib/local-data";
+import { deleteOwnAccount } from "./actions";
 import { logout, useSession } from "@/lib/use-session";
 
 export default function PendingCuratorPage() {
   const router = useRouter();
   const { user, ready } = useSession();
   const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState("");
 
   const isPendingCurator = Boolean(
     user && user.role === "curator" && (user.status === "pending" || user.status === "rejected"),
@@ -33,10 +34,12 @@ export default function PendingCuratorPage() {
     }
   }, [ready, user, router, isPendingCurator]);
 
-  function handleDelete() {
-    const db = loadDb();
-    db.users = db.users.filter((item) => item.id !== user.id);
-    saveDb(db);
+  async function handleDelete() {
+    const result = await deleteOwnAccount();
+    if (!result.ok) {
+      setError(result.error ?? "Akun gagal dihapus.");
+      return;
+    }
     logout();
     router.push("/home");
   }
@@ -120,6 +123,8 @@ export default function PendingCuratorPage() {
           </div>
         </div>
       </div>
+
+      {error && <p className="label mt-4 text-center text-wine">{error}</p>}
 
       <p className="mt-4 text-center text-[13px] font-label text-ink/65">
         Keputusan verifikasi tidak berdasarkan selera karya. Butuh bantuan? Hubungi admin melalui kanal komunitas.

@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import DashboardShell from "@/components/dashboard/dashboard-shell";
 import DashboardNav, { canOpen } from "@/components/dashboard/dashboard-nav";
-import { loadDb } from "@/lib/local-data";
-import { getSessionId } from "@/lib/auth-client";
 import { useSession } from "@/lib/use-session";
 
 export default function DashboardLayout({ children }) {
-  const router = useRouter();
   const pathname = usePathname();
   const { user, ready } = useSession();
 
@@ -20,26 +16,6 @@ export default function DashboardLayout({ children }) {
   const allowed = Boolean(
     ready && user && !suspended && !pendingCurator && canOpen(user.role, pathname),
   );
-
-  useEffect(() => {
-    if (!ready) return;
-    const id = getSessionId();
-    const db = loadDb();
-    const current = db.users.find((item) => item.id === id) ?? null;
-    if (!current) {
-      router.replace("/login");
-      return;
-    }
-    if (current.status === "suspended") {
-      router.replace("/suspended");
-      return;
-    }
-    if (current.role === "curator" && current.status !== "approved") {
-      router.replace("/pending");
-      return;
-    }
-    if (!canOpen(current.role, pathname)) router.replace("/dashboard");
-  }, [ready, pathname, router]);
 
   if (!allowed) {
     return (

@@ -1,22 +1,33 @@
-import { createSeedDb } from "@/lib/seed";
-
 const DB_KEY = "desrefuses_db_v2";
 
+function emptyDb() {
+  return {
+    categories: [],
+    users: [],
+    artworks: [],
+    comments: [],
+    reports: [],
+    challenges: [],
+    submissions: [],
+    collections: [],
+  };
+}
+
 export function loadDb() {
-  if (typeof window === "undefined") return createSeedDb();
+  if (typeof window === "undefined") return emptyDb();
 
   try {
     const raw = window.localStorage.getItem(DB_KEY);
-    if (!raw) return createSeedDb();
+    if (!raw) return emptyDb();
 
     const parsed = JSON.parse(raw);
     const required = ["categories", "users", "artworks", "comments", "reports", "challenges", "submissions"];
     if (!parsed || required.some((key) => !Array.isArray(parsed[key]))) {
-      return createSeedDb();
+      return emptyDb();
     }
     return parsed;
   } catch {
-    return createSeedDb();
+    return emptyDb();
   }
 }
 
