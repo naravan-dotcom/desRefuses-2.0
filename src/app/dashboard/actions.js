@@ -34,7 +34,7 @@ function revalidateAdmin() {
 async function removeUploads(files) {
   await Promise.all(
     files
-      .filter((file) => file.startsWith("/uploads/"))
+      .filter((file) => /^\/uploads\/(art|profile|banner)\//.test(file))
       .map(async (file) => {
         try {
           await unlink(path.join(process.cwd(), "public", file.replace(/^\/+/, "")));

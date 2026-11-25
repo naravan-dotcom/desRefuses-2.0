@@ -36,14 +36,14 @@ function validateImage(file) {
 
 async function saveImage(file) {
   const filename = `${randomUUID()}${EXTENSIONS[file.type]}`;
-  const directory = join(process.cwd(), "public", "uploads");
+  const directory = join(process.cwd(), "public", "uploads", "art");
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, filename), Buffer.from(await file.arrayBuffer()));
-  return `/uploads/${filename}`;
+  return `/uploads/art/${filename}`;
 }
 
 async function removeImage(image) {
-  if (typeof image !== "string" || !image.startsWith("/uploads/")) return;
+  if (typeof image !== "string" || !image.startsWith("/uploads/art/")) return;
   try {
     await unlink(join(process.cwd(), "public", image));
   } catch {}

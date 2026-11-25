@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { REPORT_REASONS } from "@/lib/seed";
+const REPORT_REASONS = [
+  "Plagiat",
+  "SARA",
+  "Konten tidak pantas",
+  "Perundungan",
+  "Spam",
+  "Lainnya",
+];
 import { addComment, deleteComment, submitReport, toggleFavorite, toggleLike } from "./actions";
 
 const months = [

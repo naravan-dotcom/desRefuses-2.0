@@ -36,9 +36,15 @@ yarn-error.log*
 # vercel
 .vercel
 
-# uploaded artwork assets
+# uploaded assets
 /public/uploads/*
 !/public/uploads/.gitkeep
+!/public/uploads/art/
+!/public/uploads/art/*
+!/public/uploads/profile/
+!/public/uploads/profile/*
+!/public/uploads/banner/
+!/public/uploads/banner/*
 
 # typescript
 *.tsbuildinfo

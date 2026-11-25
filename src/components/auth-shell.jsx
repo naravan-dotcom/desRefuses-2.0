@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { IMAGES } from "@/lib/seed";
+
 
 const roleNotes = [
   ["01", "text-acid", "Member", "Unggah, berinteraksi, ikut challenge."],
@@ -44,7 +44,7 @@ export default function AuthShell({ mode, children }) {
         </div>
 
         <div className="relative order-2 min-h-[460px] overflow-hidden bg-ink text-paper lg:col-span-7 lg:min-h-[760px]">
-          <img src={IMAGES.art1} alt="Galeri desRefusés" className="absolute inset-0 h-full w-full object-cover opacity-70" />
+          <img src="/uploads/art/art1.jpg" alt="Galeri desRefusés" className="absolute inset-0 h-full w-full object-cover opacity-70" />
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/55 to-ink/15" />
           <div
             className="absolute inset-0 opacity-[0.08]"

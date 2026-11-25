@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { hashPassword } from "@/lib/password";
-import { IMAGES } from "@/lib/seed";
+
 
 export async function POST(request) {
   const body = await request.json();
@@ -35,7 +35,7 @@ export async function POST(request) {
   const hashed = await hashPassword(password);
   const { rows } = await pool.query(
     "INSERT INTO users (role, status, name, username, email, password, avatar, bio, links, joined_at) VALUES ($1, $2, $3, $4, $5, $6, $7, '', '{}'::jsonb, NOW()) RETURNING id, role, status, name, username, email, avatar",
-    [role, role === "curator" ? "pending" : "approved", name, username, email, hashed, IMAGES.av6],
+    [role, role === "curator" ? "pending" : "approved", name, username, email, hashed, "/uploads/profile/av6.jpg"],
   );
 
   const row = rows[0];

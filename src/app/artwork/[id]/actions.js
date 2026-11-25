@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import pool from "@/lib/db";
-import { REPORT_REASONS } from "@/lib/seed";
+const REPORT_REASONS = [
+  "Plagiat",
+  "SARA",
+  "Konten tidak pantas",
+  "Perundungan",
+  "Spam",
+  "Lainnya",
+];
 import { toComment } from "@/lib/db-shape";
 
 function value(formData, key) {

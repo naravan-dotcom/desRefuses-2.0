@@ -37,14 +37,14 @@ function isValidUrl(value) {
 async function saveUpload(file) {
   const ext = path.extname(file.name || "").toLowerCase() || ".jpg";
   const name = `${Date.now()}-${randomUUID()}${ext}`;
-  const dir = path.join(process.cwd(), "public", "uploads");
+  const dir = path.join(process.cwd(), "public", "uploads", "profile");
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, name), Buffer.from(await file.arrayBuffer()));
-  return `/uploads/${name}`;
+  return `/uploads/profile/${name}`;
 }
 
 async function removeUpload(file) {
-  if (typeof file !== "string" || !file.startsWith("/uploads/")) return;
+  if (typeof file !== "string" || !file.startsWith("/uploads/profile/")) return;
   try {
     await unlink(path.join(process.cwd(), "public", file.replace(/^\/+/, "")));
   } catch {
