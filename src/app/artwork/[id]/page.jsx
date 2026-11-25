@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { getSessionId, isoNow, loadDb, saveDb, uid } from "@/lib/local-data";
+import { isoNow, loadDb, saveDb, uid } from "@/lib/local-data";
+import { getSessionId } from "@/lib/auth-client";
 import { createSeedDb, REPORT_REASONS } from "@/lib/seed";
 
 function cloneDb(db) {

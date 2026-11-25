@@ -1,7 +1,6 @@
 import { createSeedDb } from "@/lib/seed";
 
 const DB_KEY = "desrefuses_db_v2";
-const SESSION_KEY = "desrefuses_session_v1";
 
 export function loadDb() {
   if (typeof window === "undefined") return createSeedDb();
@@ -30,18 +29,6 @@ export function saveDb(db) {
   } catch {
     return false;
   }
-}
-
-export function getSessionId() {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(SESSION_KEY);
-}
-
-export function setSessionId(id) {
-  if (typeof window === "undefined") return;
-
-  if (id) window.localStorage.setItem(SESSION_KEY, id);
-  else window.localStorage.removeItem(SESSION_KEY);
 }
 
 export function uid(prefix) {

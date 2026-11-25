@@ -1,4 +1,5 @@
 import "./globals.css";
+import SessionProviderClient from "@/components/session-provider";
 import SiteShell from "@/components/site-shell";
 import ToastContainer from "@/components/toast";
 
@@ -23,8 +24,10 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className="min-h-full flex flex-col bg-paper text-ink">
-        <SiteShell>{children}</SiteShell>
-        <ToastContainer />
+        <SessionProviderClient>
+          <SiteShell>{children}</SiteShell>
+          <ToastContainer />
+        </SessionProviderClient>
       </body>
     </html>
   );

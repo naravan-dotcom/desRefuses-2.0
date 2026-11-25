@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Modal from "@/components/modal";
 import { notify } from "@/components/toast";
-import { getSessionId, loadDb, saveDb } from "@/lib/local-data";
+import { loadDb, saveDb } from "@/lib/local-data";
+import { getSessionId } from "@/lib/auth-client";
 import { notifySessionChange } from "@/lib/use-session";
 
 export default function DashboardAccountPage() {

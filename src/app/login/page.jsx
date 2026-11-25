@@ -1,11 +1,11 @@
 "use client";
 
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import AuthShell from "@/components/auth-shell";
 import { notify } from "@/components/toast";
-import { loadDb, setSessionId } from "@/lib/local-data";
-import { notifySessionChange } from "@/lib/use-session";
+import { homeForUser } from "@/lib/access";
 
 const demoAccounts = [
   { role: "Member", name: "Sora Vane", email: "sora@desrefuses.id", password: "member123" },
@@ -22,26 +22,31 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setError("");
-    const db = loadDb();
-    const user = db.users.find(
-      (item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password,
-    );
-    if (!user) {
-      const msg = "Email atau password tidak cocok. Coba akun demo di bawah.";
+
+    try {
+      const result = await signIn("credentials", {
+        email: email.trim(),
+        password,
+        redirect: false,
+      });
+      if (result?.error || !result?.ok) {
+        const msg = "Email atau password tidak cocok. Coba akun demo di bawah.";
+        setError(msg);
+        notify(msg, "error");
+        return;
+      }
+
+      const session = await fetch("/api/auth/session").then((response) => response.json());
+      router.push(homeForUser(session.user));
+      router.refresh();
+    } catch {
+      const msg = "Login gagal. Coba lagi.";
       setError(msg);
       notify(msg, "error");
-      return;
     }
-    setSessionId(user.id);
-    notifySessionChange();
-    if (user.status === "suspended") router.push("/suspended");
-    else if (user.role === "curator" && user.status !== "approved") router.push("/pending");
-    else if (user.role === "admin") router.push("/dashboard");
-    else if (user.role === "curator") router.push("/dashboard/challenges");
-    else router.push("/home");
   }
 
   function fillDemo(demoEmail, demoPassword) {

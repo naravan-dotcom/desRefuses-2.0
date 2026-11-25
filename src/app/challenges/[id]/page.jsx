@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { notify } from "@/components/toast";
 import ArtworkCard from "@/components/artwork-card";
-import { getSessionId, isoNow, loadDb, saveDb, uid } from "@/lib/local-data";
+import { isoNow, loadDb, saveDb, uid } from "@/lib/local-data";
+import { getSessionId } from "@/lib/auth-client";
 import { createSeedDb } from "@/lib/seed";
 
 function getStatus(challenge) {

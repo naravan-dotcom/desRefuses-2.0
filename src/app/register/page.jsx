@@ -1,12 +1,13 @@
 "use client";
 
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import AuthShell from "@/components/auth-shell";
 import { notify } from "@/components/toast";
-import { isoNow, loadDb, saveDb, setSessionId, uid } from "@/lib/local-data";
-import { notifySessionChange } from "@/lib/use-session";
+import { homeForUser } from "@/lib/access";
+import { isoNow, loadDb, saveDb } from "@/lib/local-data";
 import { IMAGES } from "@/lib/seed";
 
 export default function RegisterPage() {
@@ -19,7 +20,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setError("");
 
@@ -34,16 +35,6 @@ export default function RegisterPage() {
 
     if (!cleanName || !cleanUsername || !cleanEmail || !password || !confirmPassword) {
       fail("Semua kolom wajib diisi.");
-      return;
-    }
-
-    const db = loadDb();
-    if (db.users.some((item) => item.email.toLowerCase() === cleanEmail)) {
-      fail("Email sudah terdaftar. Gunakan email lain.");
-      return;
-    }
-    if (db.users.some((item) => item.username.toLowerCase() === cleanUsername)) {
-      fail("Username sudah digunakan.");
       return;
     }
     if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
@@ -63,27 +54,59 @@ export default function RegisterPage() {
       return;
     }
 
-    const isCurator = role === "curator";
-    const newUser = {
-      id: uid("u"),
-      role: isCurator ? "curator" : "member",
-      status: isCurator ? "pending" : "approved",
-      name: cleanName,
-      username: cleanUsername,
-      email: cleanEmail,
-      password,
-      avatar: IMAGES.av6,
-      bio: "",
-      links: { instagram: "", behance: "", website: "" },
-      favorites: [],
-      following: [],
-      joinedAt: isoNow(),
-    };
-    db.users.push(newUser);
-    saveDb(db);
-    setSessionId(newUser.id);
-    notifySessionChange();
-    router.push(isCurator ? "/pending" : "/home");
+    try {
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role,
+          name: cleanName,
+          username: cleanUsername,
+          email: cleanEmail,
+          password,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        fail(data.error ?? "Pendaftaran gagal.");
+        return;
+      }
+
+      const created = data.user;
+      const db = loadDb();
+      db.users.push({
+        id: created.id,
+        role: created.role,
+        status: created.status,
+        name: created.name,
+        username: created.username,
+        email: created.email,
+        password: "",
+        avatar: created.avatar || IMAGES.av6,
+        bio: "",
+        links: { instagram: "", behance: "", website: "" },
+        favorites: [],
+        following: [],
+        joinedAt: isoNow(),
+      });
+      saveDb(db);
+
+      const result = await signIn("credentials", {
+        email: cleanEmail,
+        password,
+        redirect: false,
+      });
+      if (result?.error || !result?.ok) {
+        router.push("/login");
+        return;
+      }
+
+      const session = await fetch("/api/auth/session").then((res) => res.json());
+      router.push(homeForUser(session.user));
+      router.refresh();
+    } catch {
+      fail("Pendaftaran gagal. Coba lagi.");
+    }
   }
 
   return (

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "@/components/confirm-dialog";
-import { getSessionId, loadDb, saveDb } from "@/lib/local-data";
+import { loadDb, saveDb } from "@/lib/local-data";
+import { getSessionId } from "@/lib/auth-client";
 import { createSeedDb } from "@/lib/seed";
 
 const statusLabels = {

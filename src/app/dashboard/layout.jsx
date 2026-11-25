@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import DashboardShell from "@/components/dashboard/dashboard-shell";
 import DashboardNav, { canOpen } from "@/components/dashboard/dashboard-nav";
-import { getSessionId, loadDb } from "@/lib/local-data";
+import { loadDb } from "@/lib/local-data";
+import { getSessionId } from "@/lib/auth-client";
 import { useSession } from "@/lib/use-session";
 
 export default function DashboardLayout({ children }) {
