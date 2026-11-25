@@ -1,22 +1,28 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export default function Modal({ open, onClose, title, subtitle, children, maxWidth = "max-w-2xl" }) {
   useEffect(() => {
     if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     function onKeyDown(event) {
       if (event.key === "Escape") onClose?.();
     }
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[150] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-[2px]"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose?.();
       }}
@@ -42,6 +48,7 @@ export default function Modal({ open, onClose, title, subtitle, children, maxWid
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

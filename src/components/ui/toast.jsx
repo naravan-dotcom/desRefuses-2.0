@@ -28,7 +28,7 @@ export default function ToastContainer() {
   if (!items.length) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-[200] flex max-w-sm flex-col gap-2.5">
+    <div className="fixed bottom-4 left-4 right-4 z-[200] flex flex-col gap-2.5 sm:bottom-5 sm:left-auto sm:right-5 sm:w-full sm:max-w-sm">
       {items.map((item) => {
         const isError = item.type === "error";
         return (

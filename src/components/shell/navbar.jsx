@@ -66,15 +66,15 @@ export default function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur-md">
-        <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between gap-6 px-5 lg:px-10">
-          <Link href="/home" className="group flex shrink-0 items-center gap-3">
+        <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-5 lg:px-10">
+          <Link href="/home" className="group flex shrink-0 items-center gap-2.5 sm:gap-3">
             <img
               src="/desrefuses-mark.png"
               alt=""
-              className="h-11 w-auto object-contain transition-transform duration-500 group-hover:scale-105"
+              className="h-9 w-auto object-contain transition-transform duration-500 group-hover:scale-105 sm:h-11"
             />
             <span className="flex flex-col">
-              <span className="font-display text-[23px] leading-none">desRefusés</span>
+              <span className="font-display text-[20px] leading-none sm:text-[23px]">desRefusés</span>
               <span className="label mt-1.5 hidden text-ink/65 sm:block">Salon 1863</span>
             </span>
           </Link>
@@ -197,7 +197,7 @@ export default function Navbar() {
             <i className="fa-solid fa-xmark text-xl" />
           </button>
         </div>
-        <nav className="mt-16 flex flex-col gap-5">
+        <nav className="mt-12 flex flex-1 flex-col gap-4 overflow-y-auto">
           {links.map((link) => (
             <Link
               key={link.href}
@@ -208,7 +208,17 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          {user && (
+          {roleLinks(user).map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMobileOpen(false)}
+              className={`font-display text-[27px] ${pathname === link.href ? "text-acid" : "text-paper"}`}
+            >
+              {link.label}
+            </Link>
+          ))}
+          {user && !isAdmin && (
             <Link
               href={`/creator/${user.dbId ?? String(user.id).replace(/^u/, "")}`}
               onClick={() => setMobileOpen(false)}

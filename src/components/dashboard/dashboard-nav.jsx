@@ -105,7 +105,7 @@ export default function DashboardNav() {
       {visible.map((group) => (
         <div key={group.label}>
           <p className="label mb-2 text-ink/45">{group.label}</p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-row flex-wrap gap-1.5 lg:flex-col lg:gap-1">
             {group.items.map((item) => {
               const active = pathname === item.href;
               return (
