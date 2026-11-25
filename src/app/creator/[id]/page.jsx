@@ -3,31 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import ArtworkCard from "@/components/artwork-card";
 import { loadDb, saveDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 import { useSession } from "@/lib/use-session";
-
-const months = [
-  "Januari",
-  "Februari",
-  "Maret",
-  "April",
-  "Mei",
-  "Juni",
-  "Juli",
-  "Agustus",
-  "September",
-  "Oktober",
-  "November",
-  "Desember",
-];
-
-function formatDate(value) {
-  if (!value) return "—";
-  const [year, month, day] = value.slice(0, 10).split("-");
-  const monthName = months[Number(month) - 1] ?? month;
-  return `${Number(day)} ${monthName} ${year}`;
-}
 
 function externalHref(value) {
   return /^https?:\/\//i.test(value) ? value : null;
@@ -40,34 +19,23 @@ export default function CreatorPage() {
 
   const [db, setDb] = useState(() => createSeedDb());
   const [notice, setNotice] = useState("");
+  const { user } = useSession();
 
   useEffect(() => {
     const timer = setTimeout(() => setDb(loadDb()), 0);
     return () => clearTimeout(timer);
   }, []);
 
-  const creator = useMemo(
-    () => db.users.find((user) => user.id === id),
-    [db, id],
-  );
-
-  const { user } = useSession();
-  const isFollowing = Boolean(
-    user && creator && user.id !== creator.id && (user.following ?? []).includes(creator.id),
-  );
-
+  const creator = useMemo(() => db.users.find((item) => item.id === id), [db, id]);
   const artworks = useMemo(
-    () =>
-      db.artworks
-        .filter((item) => item.userId === id)
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    () => db.artworks.filter((item) => item.userId === id).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     [db, id],
   );
-
   const categoryNames = useMemo(
     () => Object.fromEntries(db.categories.map((item) => [item.id, item.name])),
     [db],
   );
+  const isFollowing = Boolean(user && creator && user.id !== creator.id && (user.following ?? []).includes(creator.id));
 
   const links = creator
     ? [
@@ -77,12 +45,7 @@ export default function CreatorPage() {
       ].filter((item) => item.value)
     : [];
 
-  const roleLabel =
-    creator?.role === "admin"
-      ? "Admin"
-      : creator?.role === "curator"
-        ? "Kurator"
-        : "Member";
+  const roleLabel = creator?.role === "admin" ? "Admin" : creator?.role === "curator" ? "Kurator" : "Member";
 
   function toggleFollow() {
     if (!user) {
@@ -113,157 +76,101 @@ export default function CreatorPage() {
     setDb(next);
   }
 
+  if (!creator) {
+    return (
+      <main className="page-enter px-5 py-16 lg:px-10">
+        <div className="mx-auto max-w-3xl border border-dashed border-ink/20 p-10 text-center">
+          <i className="fa-regular fa-user text-2xl text-ink/40" />
+          <h1 className="font-display mt-4 text-[28px]">Kreator tidak ditemukan.</h1>
+          <Link href="/gallery" className="btn btn-outline btn-sm mt-5">Kembali ke galeri</Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="px-6 py-12 sm:px-10">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <Link
-          href="/gallery"
-          className="text-[10px] uppercase tracking-[0.16em] text-ink/45 hover:text-ink"
-        >
-          Kembali ke galeri
+    <main className="page-enter">
+      <div className="mx-auto max-w-[1240px] px-5 py-12 lg:px-10 lg:py-16">
+        <Link href="/gallery" className="label flex w-fit items-center gap-2 text-ink/65 hover:text-ink">
+          <i className="fa-solid fa-arrow-left text-[11px]" /> Kembali ke galeri
         </Link>
 
-        {!creator ? (
-          <div className="border border-dashed border-ink/20 p-10 text-center">
-            <p className="text-sm text-ink/55">Kreator tidak ditemukan.</p>
-            <Link href="/gallery" className="mt-4 inline-block text-xs underline">
-              Kembali ke galeri
-            </Link>
-          </div>
-        ) : (
-          <>
-            <section className="border border-ink/15 bg-white p-5 sm:p-7">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                {creator.avatar ? (
-                  <img
-                    src={creator.avatar}
-                    alt={`Foto profil ${creator.name}`}
-                    className="h-20 w-20 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-20 w-20 items-center justify-center border border-ink/15 bg-ink/5 text-xs text-ink/40">
-                    Foto
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                    Profil kreator · {roleLabel}
-                  </p>
-                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                    {creator.name}
-                  </h1>
-                  <p className="text-sm text-ink/55">@{creator.username}</p>
-                  {creator.bio && (
-                    <p className="max-w-2xl text-sm leading-relaxed text-ink/70">
-                      {creator.bio}
-                    </p>
-                  )}
-                  {user && user.id !== creator.id && user.role === "member" && (
-                    <button
-                      type="button"
-                      onClick={toggleFollow}
-                      className="border border-ink/20 px-3 py-2 text-xs transition-colors hover:border-ink"
-                    >
-                      {isFollowing ? "Mengikuti" : "Ikuti"}
-                    </button>
-                  )}
-                </div>
+        <section className="mt-8 border-b hairline pb-12">
+          <div className="grid gap-8 lg:grid-cols-12 lg:gap-14">
+            <div className="lg:col-span-4">
+              <div className="art-media aspect-[4/5] bg-canvas">
+                <img src={creator.avatar || "/desrefuses-mark.png"} alt={`Foto profil ${creator.name}`} className="art-img h-full w-full object-cover" />
               </div>
+            </div>
+            <div className="lg:col-span-8">
+              <div className="label text-wine">Profil kreator · {roleLabel}</div>
+              <h1 className="font-display mt-4 text-[42px] leading-[1.06] sm:text-[58px]">{creator.name}</h1>
+              <p className="mt-2 text-[15px] text-ink/60">@{creator.username}</p>
+              {creator.status && creator.role === "curator" && (
+                <span className={`status mt-4 ${creator.status === "approved" ? "status-approved" : creator.status === "pending" ? "status-pending" : "status-rejected"}`}>
+                  Kurator {creator.status}
+                </span>
+              )}
+              {creator.bio && <p className="mt-6 max-w-2xl text-[15px] leading-[1.8] text-ink/70">{creator.bio}</p>}
+              {user && user.id !== creator.id && user.role === "member" && (
+                <button type="button" onClick={toggleFollow} className={`btn btn-sm mt-7 ${isFollowing ? "btn-outline" : "btn-ink"}`}>
+                  <i className={`fa-${isFollowing ? "solid" : "regular"} fa-user-plus mr-1`} />
+                  {isFollowing ? "Mengikuti" : "Ikuti"}
+                </button>
+              )}
+              {notice && <p className="label mt-4 text-wine">{notice}</p>}
 
               {links.length > 0 ? (
-                <div className="mt-6 grid gap-3 border-t border-ink/10 pt-5 sm:grid-cols-3">
-                  {links.map((link) =>
-                    externalHref(link.value) ? (
-                      <a
-                        key={link.label}
-                        href={externalHref(link.value)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="border border-ink/15 p-3 text-xs transition-colors hover:border-ink"
-                      >
-                        <span className="block text-[10px] uppercase tracking-[0.14em] text-ink/40">
-                          {link.label}
-                        </span>
-                        <span className="mt-1 block break-all text-ink/70">
-                          {link.value}
-                        </span>
+                <div className="mt-8 grid gap-3 border-t hairline pt-6 sm:grid-cols-3">
+                  {links.map((link) => {
+                    const href = externalHref(link.value);
+                    const content = (
+                      <>
+                        <span className="label text-ink/55">{link.label}</span>
+                        <span className="mt-1 block break-all text-[13px] text-ink/70">{link.value}</span>
+                      </>
+                    );
+                    return href ? (
+                      <a key={link.label} href={href} target="_blank" rel="noreferrer" className="border hairline p-4 transition-colors hover:border-ink">
+                        {content}
                       </a>
                     ) : (
-                      <div
-                        key={link.label}
-                        className="border border-ink/15 p-3 text-xs"
-                      >
-                        <span className="block text-[10px] uppercase tracking-[0.14em] text-ink/40">
-                          {link.label}
-                        </span>
-                        <span className="mt-1 block break-all text-ink/70">
-                          {link.value}
-                        </span>
-                      </div>
-                    ),
-                  )}
+                      <div key={link.label} className="border hairline p-4">{content}</div>
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="mt-6 border-t border-ink/10 pt-5 text-xs text-ink/45">
-                  Belum ada tautan eksternal.
-                </p>
+                <p className="mt-8 border-t hairline pt-6 text-[13px] text-ink/55">Belum ada tautan eksternal.</p>
               )}
-            </section>
+            </div>
+          </div>
+        </section>
 
-            {notice && <p className="text-xs text-ink/55">{notice}</p>}
-
-            <section className="space-y-4">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                    Galeri kreator
-                  </p>
-                  <h2 className="mt-1 text-xl font-semibold">
-                    Karya dari {creator.name}
-                  </h2>
-                </div>
-                <p className="text-xs text-ink/50">{artworks.length} karya</p>
-              </div>
-
-              {artworks.length === 0 ? (
-                <p className="border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
-                  Kreator ini belum mempublikasikan karya.
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                  {artworks.map((artwork) => (
-                    <Link
-                      key={artwork.id}
-                      href={`/artwork/${artwork.id}`}
-                      className="group block border border-ink/15 bg-white transition-colors hover:border-ink/40"
-                    >
-                      <div className="aspect-[4/5] overflow-hidden bg-ink/5">
-                        <img
-                          src={artwork.image}
-                          alt={artwork.title}
-                          loading="lazy"
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                        />
-                      </div>
-                      <div className="p-3">
-                        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                          {categoryNames[artwork.categoryId] ?? "Tanpa kategori"}
-                        </p>
-                        <h3 className="mt-1 text-sm font-medium leading-snug">
-                          {artwork.title}
-                        </h3>
-                        <div className="mt-3 flex flex-wrap gap-3 border-t border-ink/10 pt-2 text-[10px] uppercase tracking-[0.12em] text-ink/45">
-                          <span>{artwork.likes} suka</span>
-                          <span>{formatDate(artwork.createdAt)}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
-        )}
+        <section className="pt-12">
+          <div className="label text-ink/65">Galeri kreator</div>
+          <div className="mt-3 flex items-end justify-between gap-4">
+            <h2 className="font-display text-[34px] leading-[1.12]">Karya dari {creator.name}.</h2>
+            <p className="label text-ink/65">{artworks.length} karya</p>
+          </div>
+          {artworks.length ? (
+            <div className="mt-8 columns-1 gap-8 sm:columns-2 xl:columns-3">
+              {artworks.map((artwork, index) => (
+                <ArtworkCard
+                  key={artwork.id}
+                  artwork={artwork}
+                  creator={creator.name}
+                  creatorId={creator.id}
+                  category={categoryNames[artwork.categoryId]}
+                  index={index}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-8 border border-dashed border-ink/20 p-10 text-center text-[14px] text-ink/55">
+              Kreator ini belum mempublikasikan karya.
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

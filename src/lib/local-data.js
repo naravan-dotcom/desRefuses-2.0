@@ -11,7 +11,8 @@ export function loadDb() {
     if (!raw) return createSeedDb();
 
     const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.users) || !Array.isArray(parsed.artworks)) {
+    const required = ["categories", "users", "artworks", "comments", "reports", "challenges", "submissions"];
+    if (!parsed || required.some((key) => !Array.isArray(parsed[key]))) {
       return createSeedDb();
     }
     return parsed;

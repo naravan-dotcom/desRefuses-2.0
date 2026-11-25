@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getSessionId, loadDb } from "@/lib/local-data";
+import { useEffect, useMemo, useState } from "react";
+import { getSessionId, loadDb, saveDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
 const ROLE_LABEL = { admin: "Admin", member: "Member", curator: "Kurator" };
@@ -14,6 +14,11 @@ function pad(value) {
 function todayStr() {
   const date = new Date();
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function artCode(artwork) {
+  const digits = String(artwork?.id || "").replace(/\D/g, "");
+  return digits ? `No. ${digits.padStart(2, "0")}` : `DR-${String(artwork.id).slice(-4).toUpperCase()}`;
 }
 
 export default function DashboardPage() {
@@ -34,10 +39,8 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     if (!user) return null;
-
     const today = todayStr();
-    const isActive = (challenge) =>
-      challenge.startDate <= today && challenge.endDate >= today;
+    const isActive = (challenge) => challenge.startDate <= today && challenge.endDate >= today;
     const roleCounts = db.users.reduce(
       (acc, item) => {
         acc[item.role] = (acc[item.role] ?? 0) + 1;
@@ -46,56 +49,51 @@ export default function DashboardPage() {
       { admin: 0, member: 0, curator: 0 },
     );
     const ownArtworks = db.artworks.filter((item) => item.userId === user.id);
-    const ownChallenges = db.challenges.filter(
-      (item) => item.curatorId === user.id,
-    );
+    const ownChallenges = db.challenges.filter((item) => item.curatorId === user.id);
     const ownChallengeIds = ownChallenges.map((item) => item.id);
-    const recentSource =
-      user.role === "member" ? ownArtworks : db.artworks;
+    const pendingCuratorsList = db.users.filter((item) => item.role === "curator" && item.status === "pending");
+    const openReportsList = db.reports.filter((item) => item.status === "open");
 
     return {
       roleCounts,
-      openReports: db.reports.filter((item) => item.status === "open").length,
-      pendingCurators: db.users.filter(
-        (item) => item.role === "curator" && item.status === "pending",
-      ).length,
+      openReports: openReportsList.length,
+      openReportsList: openReportsList.slice(0, 4),
+      pendingCurators: pendingCuratorsList.length,
+      pendingCuratorsList: pendingCuratorsList.slice(0, 4),
       activeChallenges: db.challenges.filter(isActive).length,
       ownArtworksCount: ownArtworks.length,
       totalLikes: ownArtworks.reduce((sum, item) => sum + (item.likes ?? 0), 0),
       favorites: (user.favorites ?? []).length,
-      ownSubmissions: db.submissions.filter(
-        (item) => item.userId === user.id,
-      ).length,
-      incomingSubmissions: db.submissions.filter((item) =>
-        ownChallengeIds.includes(item.challengeId),
-      ).length,
+      ownSubmissions: db.submissions.filter((item) => item.userId === user.id).length,
+      incomingSubmissions: db.submissions.filter((item) => ownChallengeIds.includes(item.challengeId)).length,
+      ownChallengesCount: ownChallenges.length,
       ownActiveChallenges: ownChallenges.filter(isActive).length,
       winners: ownChallenges.reduce(
-        (sum, challenge) =>
-          sum +
-          ["first", "second", "third"].filter(
-            (rank) => challenge.winners?.[rank],
-          ).length,
+        (sum, challenge) => sum + ["first", "second", "third"].filter((rank) => challenge.winners?.[rank]).length,
         0,
       ),
-      recentArtworks: [...recentSource]
+      recentArtworks: [...ownArtworks]
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 3)
-        .map((item) => ({
-          ...item,
-          creator:
-            db.users.find((entry) => entry.id === item.userId)?.name ??
-            "Kreator tidak diketahui",
-        })),
+        .slice(0, 4),
+      featuredArtwork: [...ownArtworks].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0))[0] ?? null,
       recentChallenges: [...ownChallenges]
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 3),
+        .slice(0, 4),
     };
   }, [db, user]);
 
+  function quickApproveCurator(id) {
+    const next = loadDb();
+    const target = next.users.find((item) => item.id === id && item.role === "curator");
+    if (!target) return;
+    target.status = "approved";
+    saveDb(next);
+    setDb(next);
+  }
+
   if (!loaded || !user || !stats) {
     return (
-      <div className="border border-ink/15 bg-white p-8 text-center text-sm text-ink/45">
+      <div className="border hairline bg-white p-8 text-center text-sm text-ink/55">
         Memuat data dashboard...
       </div>
     );
@@ -113,181 +111,259 @@ export default function DashboardPage() {
         ]
       : user.role === "member"
         ? [
-            {
-              label: "Karya saya",
-              value: stats.ownArtworksCount,
-              note: "Portofolio publik",
-            },
+            { label: "Karya saya", value: stats.ownArtworksCount, note: "Portofolio publik" },
             { label: "Apresiasi", value: stats.totalLikes, note: "Total suka diterima" },
             { label: "Favorit", value: stats.favorites, note: "Karya tersimpan" },
             { label: "Submisi", value: stats.ownSubmissions, note: "Challenge diikuti" },
           ]
         : [
-            {
-              label: "Challenge",
-              value: db.challenges.filter((item) => item.curatorId === user.id).length,
-              note: "Dibuat oleh Anda",
-            },
-            {
-              label: "Submisi masuk",
-              value: stats.incomingSubmissions,
-              note: "Karya partisipan",
-            },
-            {
-              label: "Challenge aktif",
-              value: stats.ownActiveChallenges,
-              note: "Periode berjalan",
-            },
+            { label: "Challenge", value: stats.ownChallengesCount, note: "Dibuat oleh Anda" },
+            { label: "Submisi masuk", value: stats.incomingSubmissions, note: "Karya partisipan" },
+            { label: "Challenge aktif", value: stats.ownActiveChallenges, note: "Periode berjalan" },
             { label: "Pemenang", value: stats.winners, note: "Juara 1–3 ditandai" },
-          ];
-
-  const links =
-    user.role === "admin"
-      ? [
-          { label: "Verifikasi kurator", href: "/dashboard/curators", note: `${stats.pendingCurators} menunggu tinjauan` },
-          { label: "Moderasi konten", href: "/dashboard/moderation", note: `${stats.openReports} laporan open` },
-          { label: "Kelola pengguna", href: "/dashboard/users", note: "Lihat dan hapus akun" },
-        ]
-      : user.role === "member"
-        ? [
-            { label: "Karya saya", href: "/dashboard/artworks", note: "Unggah dan kelola karya" },
-            { label: "Jelajahi challenge", href: "/challenges", note: "Cari challenge aktif" },
-            { label: "Submisi saya", href: "/dashboard/submissions", note: "Lihat riwayat kiriman" },
-          ]
-        : [
-            { label: "Challenge saya", href: "/dashboard/challenges", note: "Buat dan kelola event" },
-            { label: "Jelajahi challenge", href: "/challenges", note: "Lihat halaman publik" },
           ];
 
   return (
     <>
-      <header className="space-y-2">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-          Dashboard · {ROLE_LABEL[user.role] ?? user.role}
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Halo, {user.name}
-        </h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-ink/55">
-          Ringkasan aktivitas Anda dihitung langsung dari data platform.
+      <header className="border-b hairline pb-5">
+        <p className="label text-wine">Ringkasan · {ROLE_LABEL[user.role] ?? user.role}</p>
+        <h1 className="font-display mt-2 text-3xl lg:text-4xl">Halo, {user.name}.</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink/65">
+          {user.role === "admin"
+            ? "Ringkasan statistik platform dan antrean yang perlu ditinjau."
+            : user.role === "curator"
+              ? "Pantau perkembangan challenge dan submisi partisipan Anda."
+              : "Pantau portofolio, apresiasi, dan submisi challenge Anda."}
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {user.role === "member" && stats.featuredArtwork && (
+        <Link
+          href={`/artwork/${stats.featuredArtwork.id}`}
+          className="group grid overflow-hidden border hairline bg-ink text-paper sm:grid-cols-[minmax(0,.95fr)_minmax(0,1.05fr)]"
+        >
+          <div className="relative min-h-[240px] overflow-hidden bg-ink/20 sm:min-h-[300px]">
+            <img
+              src={stats.featuredArtwork.image}
+              alt=""
+              className="art-img absolute inset-0 h-full w-full object-cover opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
+            <span className="absolute left-4 top-4 bg-paper/95 px-2.5 py-1 font-label text-[11px] uppercase tracking-wider text-ink">
+              {db.categories.find((item) => item.id === stats.featuredArtwork.categoryId)?.name ?? "Karya"}
+            </span>
+          </div>
+          <div className="flex flex-col justify-between p-6 lg:p-7">
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="label text-paper/70">Sorotan portofolio</span>
+                <span className="label text-pink">{artCode(stats.featuredArtwork)}</span>
+              </div>
+              <h2 className="font-display mt-4 break-words text-3xl leading-[1.05] transition-colors group-hover:text-pink">
+                {stats.featuredArtwork.title}
+              </h2>
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-label text-[13px] text-paper/70">
+                <span>
+                  <i className="fa-solid fa-heart mr-1.5 text-pink" />
+                  {stats.featuredArtwork.likes ?? 0} suka
+                </span>
+                <span>{stats.featuredArtwork.createdAt.slice(0, 10)}</span>
+              </div>
+            </div>
+            <div className="mt-8 flex items-center justify-between gap-3 border-t border-paper/15 pt-4 font-label text-[12px] uppercase tracking-wider">
+              <span>Karya paling diapresiasi</span>
+              <span className="flex items-center gap-2">
+                Buka karya <i className="fa-solid fa-arrow-right" />
+              </span>
+            </div>
+          </div>
+        </Link>
+      )}
+
+      <section className={`grid grid-cols-2 gap-4 ${user.role === "admin" ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
         {cards.map((item) => (
-          <div key={item.label} className="border border-ink/15 bg-white p-4">
-            <p className="text-2xl font-semibold">{item.value}</p>
-            <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              {item.label}
-            </p>
-            <p className="mt-1 text-xs text-ink/45">{item.note}</p>
+          <div key={item.label} className="card p-5">
+            <div className="font-display text-[34px] leading-none">{item.value}</div>
+            <div className="label mt-3 text-wine">{item.label}</div>
+            <p className="mt-1 text-[13px] text-ink/55">{item.note}</p>
           </div>
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="border border-ink/15 bg-white p-5">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            {user.role === "curator" ? "Challenge terbaru" : "Karya terbaru"}
-          </p>
-          <h2 className="mt-1 text-lg font-medium">
-            {user.role === "curator" ? "Event Anda" : "Portofolio"}
-          </h2>
-          <div className="mt-4 space-y-3">
-            {user.role === "curator" ? (
-              stats.recentChallenges.length === 0 ? (
-                <div className="border border-dashed border-ink/20 p-6 text-center text-sm text-ink/45">
-                  Belum ada challenge.
-                </div>
+      {user.role === "admin" && (
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="border hairline bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="label text-ink/60">Antrean verifikasi</p>
+                <h2 className="font-display mt-2 text-2xl leading-none">Kurator pending</h2>
+              </div>
+              <Link href="/dashboard/curators" className="label text-wine hover:text-ink">
+                Semua <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
+              </Link>
+            </div>
+            <div className="mt-5 space-y-3">
+              {stats.pendingCuratorsList.length === 0 ? (
+                <p className="border-t hairline pt-4 text-[14px] text-ink/55">
+                  Tidak ada kurator menunggu verifikasi.
+                </p>
               ) : (
-                stats.recentChallenges.map((item) => (
-                  <div key={item.id} className="border border-ink/15 p-4">
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="mt-1 text-xs text-ink/45">
-                      {item.startDate} — {item.endDate}
-                    </p>
+                stats.pendingCuratorsList.map((curator) => (
+                  <div key={curator.id} className="flex items-center justify-between gap-3 border hairline p-3.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img src={curator.avatar || "/desrefuses-mark.png"} alt="" className="avatar h-9 w-9 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-semibold">{curator.name}</p>
+                        <p className="truncate text-[12px] text-ink/55">@{curator.username}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => quickApproveCurator(curator.id)}
+                      className="btn btn-ink btn-sm shrink-0"
+                    >
+                      Approve
+                    </button>
                   </div>
                 ))
-              )
-            ) : stats.recentArtworks.length === 0 ? (
-              <div className="border border-dashed border-ink/20 p-6 text-center text-sm text-ink/45">
-                Belum ada karya untuk ditampilkan.
+              )}
+            </div>
+          </div>
+
+          <div className="border hairline bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="label text-ink/60">Antrean moderasi</p>
+                <h2 className="font-display mt-2 text-2xl leading-none">Laporan terbuka</h2>
               </div>
-            ) : (
+              <Link href="/dashboard/moderation" className="label text-wine hover:text-ink">
+                Semua <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
+              </Link>
+            </div>
+            <div className="mt-5 space-y-3">
+              {stats.openReportsList.length === 0 ? (
+                <p className="border-t hairline pt-4 text-[14px] text-ink/55">
+                  Tidak ada laporan terbuka saat ini.
+                </p>
+              ) : (
+                stats.openReportsList.map((report) => {
+                  const reporter = db.users.find((u) => u.id === report.reporterId);
+                  return (
+                    <div key={report.id} className="flex items-center justify-between gap-3 border hairline p-3.5">
+                      <div className="min-w-0">
+                        <p className="font-label text-[11px] uppercase tracking-wider text-wine">
+                          {report.reason}
+                        </p>
+                        <p className="mt-0.5 truncate text-[13px] text-ink/75">
+                          {report.type === "artwork" ? "Karya" : "Komentar"} · Pelapor: {reporter?.name ?? "Member"}
+                        </p>
+                      </div>
+                      <span className="status status-pending shrink-0">Open</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {user.role === "member" && (
+        <section className="border hairline bg-white p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="label text-ink/60">Portofolio</p>
+              <h2 className="font-display mt-2 text-2xl leading-none">Karya terbaru</h2>
+            </div>
+            <Link href="/dashboard/artworks" className="label text-wine hover:text-ink">
+              Kelola karya <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
+            </Link>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {stats.recentArtworks.length ? (
               stats.recentArtworks.map((item) => (
-                <div key={item.id} className="border border-ink/15 p-4">
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="mt-1 text-xs text-ink/45">Oleh {item.creator}</p>
-                </div>
+                <Link
+                  key={item.id}
+                  href={`/artwork/${item.id}`}
+                  className="group flex items-center gap-4 border hairline p-3.5 transition-colors hover:border-ink"
+                >
+                  <img src={item.image} alt="" className="h-14 w-14 shrink-0 object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold group-hover:text-wine">{item.title}</p>
+                    <p className="mt-1 text-[12px] text-ink/55">
+                      <i className="fa-solid fa-heart mr-1 text-wine/70" />
+                      {item.likes ?? 0} suka · {item.createdAt.slice(0, 10)}
+                    </p>
+                  </div>
+                </Link>
               ))
+            ) : (
+              <p className="col-span-2 border-t hairline pt-4 text-[14px] text-ink/55">
+                Belum ada karya. Unggah karya pertama Anda dari menu Karya saya.
+              </p>
             )}
           </div>
-        </div>
+        </section>
+      )}
 
-        <div className="border border-ink/15 bg-white p-5">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Langkah berikutnya
-          </p>
-          <h2 className="mt-1 text-lg font-medium">Tetap bergerak</h2>
-          <div className="mt-4 space-y-3">
-            {links.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block border border-ink/15 p-4 transition-colors hover:border-ink"
-              >
-                <p className="text-sm font-medium">{item.label}</p>
-                <p className="mt-1 text-xs leading-relaxed text-ink/55">
-                  {item.note}
-                </p>
-              </Link>
-            ))}
+      {user.role === "curator" && (
+        <section className="border hairline bg-white p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="label text-ink/60">Event Anda</p>
+              <h2 className="font-display mt-2 text-2xl leading-none">Challenge terbaru</h2>
+            </div>
+            <Link href="/dashboard/challenges" className="label text-wine hover:text-ink">
+              Semua <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
+            </Link>
           </div>
-        </div>
-      </section>
+          <div className="mt-5 space-y-3">
+            {stats.recentChallenges.length ? (
+              stats.recentChallenges.map((item) => {
+                const today = todayStr();
+                const statusClass =
+                  item.startDate <= today && item.endDate >= today
+                    ? "status-live"
+                    : item.startDate > today
+                      ? "status-upcoming"
+                      : "status-ended";
+                const statusText =
+                  statusClass === "status-live"
+                    ? "Berlangsung"
+                    : statusClass === "status-upcoming"
+                      ? "Akan datang"
+                      : "Selesai";
+                const submissionCount = db.submissions.filter(
+                  (entry) => entry.challengeId === item.id,
+                ).length;
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        <div className="border border-ink/15 bg-white p-5">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Status akun
-          </p>
-          <p className="mt-2 text-sm font-medium">{user.name}</p>
-          <p className="mt-1 text-xs text-ink/55">{user.email}</p>
-          <p className="mt-1 text-xs text-ink/45">
-            {ROLE_LABEL[user.role] ?? user.role} · {user.status}
-          </p>
-        </div>
-        <div className="border border-ink/15 bg-white p-5">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Antrean
-          </p>
-          <p className="mt-2 text-sm font-medium">
-            {user.role === "admin"
-              ? `${stats.pendingCurators} verifikasi kurator`
-              : user.role === "member"
-                ? `${stats.ownSubmissions} submisi aktif`
-                : `${stats.incomingSubmissions} submisi masuk`}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-ink/55">
-            {user.role === "admin"
-              ? `${stats.openReports} laporan menunggu keputusan.`
-              : user.role === "member"
-                ? `${stats.favorites} karya disimpan di favorit.`
-                : `${stats.winners} karya sudah ditandai sebagai pemenang.`}
-          </p>
-        </div>
-        <div className="border border-ink/15 bg-white p-5">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Data platform
-          </p>
-          <p className="mt-2 text-sm font-medium">
-            {db.categories.length} kategori · {db.comments.length} komentar
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-ink/55">
-            {db.submissions.length} submisi dari {db.users.length} akun terdaftar.
-          </p>
-        </div>
-      </section>
+                return (
+                  <div key={item.id} className="flex items-center gap-4 border hairline p-4">
+                    <img src={item.banner} alt="" className="h-12 w-16 shrink-0 object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold">{item.title}</p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span className={`status ${statusClass}`}>{statusText}</span>
+                        <span className="label text-ink/55">{submissionCount} submisi</span>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/dashboard/challenges?challenge=${item.id}`}
+                      className="btn btn-outline btn-sm shrink-0"
+                    >
+                      Kelola
+                    </Link>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="border-t hairline pt-4 text-[14px] text-ink/55">
+                Belum ada challenge. Buat challenge baru di menu Tantangan saya.
+              </p>
+            )}
+          </div>
+        </section>
+      )}
     </>
   );
 }

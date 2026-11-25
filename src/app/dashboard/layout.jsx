@@ -37,11 +37,22 @@ export default function DashboardLayout({ children }) {
 
   if (!allowed) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-16 text-sm text-ink/45 sm:px-10">
-        Memeriksa sesi...
+      <div className="page-enter grid min-h-[60vh] place-items-center px-5">
+        <p className="label text-ink/55">Memeriksa sesi...</p>
       </div>
     );
   }
 
-  return <DashboardShell nav={<DashboardNav />}>{children}</DashboardShell>;
+  const roomLabel =
+    user.role === "curator"
+      ? "Ruang curator"
+      : user.role === "admin"
+        ? "Ruang admin"
+        : "Ruang member";
+
+  return (
+    <DashboardShell label={roomLabel} nav={<DashboardNav />}>
+      {children}
+    </DashboardShell>
+  );
 }

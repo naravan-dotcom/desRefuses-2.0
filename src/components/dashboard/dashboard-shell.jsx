@@ -1,9 +1,12 @@
-export default function DashboardShell({ nav, children }) {
+export default function DashboardShell({ nav, children, label = "Ruang kerja" }) {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10 sm:px-10">
-      <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
-        <aside className="h-fit border border-ink/15 bg-white p-4">{nav}</aside>
-        <div className="min-w-0 space-y-6">{children}</div>
+    <div className="page-enter mx-auto max-w-[1240px] px-5 py-8 lg:px-8 lg:py-10">
+      <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="h-fit border hairline bg-white p-5 lg:sticky lg:top-24">
+          <div className="label mb-5 text-wine">{label}</div>
+          {nav}
+        </aside>
+        <div className="min-w-0 space-y-8">{children}</div>
       </div>
     </div>
   );

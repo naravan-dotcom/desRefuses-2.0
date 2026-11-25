@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import ConfirmDialog from "@/components/confirm-dialog";
+import Modal from "@/components/modal";
+import { notify } from "@/components/toast";
 import { isoNow, loadDb, saveDb, uid } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 import { useSession } from "@/lib/use-session";
@@ -15,6 +19,24 @@ const emptyForm = {
   endDate: "",
   banner: "",
 };
+
+const statusLabels = {
+  active: "Aktif",
+  upcoming: "Mendatang",
+  ended: "Selesai",
+};
+
+const statusClasses = {
+  active: "status-live",
+  upcoming: "status-upcoming",
+  ended: "status-ended",
+};
+
+const winnerRanks = [
+  { key: "first", label: "Juara 1" },
+  { key: "second", label: "Juara 2" },
+  { key: "third", label: "Juara 3" },
+];
 
 function getStatus(challenge) {
   const now = new Date();
@@ -34,6 +56,8 @@ function formatDate(value) {
 
 export default function DashboardChallengesPage() {
   const { user } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [db, setDb] = useState(() => createSeedDb());
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -41,6 +65,14 @@ export default function DashboardChallengesPage() {
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (error) notify(error, "error");
+  }, [error]);
+
+  useEffect(() => {
+    if (notice) notify(notice, "success");
+  }, [notice]);
   const [confirmingId, setConfirmingId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [winnerDraft, setWinnerDraft] = useState({ first: null, second: null, third: null });
@@ -101,11 +133,18 @@ export default function DashboardChallengesPage() {
     return used;
   }, [winnerDraft]);
 
+  function clearQuery() {
+    if (searchParams.get("create") || searchParams.get("challenge")) {
+      router.replace("/dashboard/challenges", { scroll: false });
+    }
+  }
+
   function resetForm() {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
     setFileName("");
+    clearQuery();
   }
 
   function pickBanner(event) {
@@ -144,16 +183,19 @@ export default function DashboardChallengesPage() {
     setError("");
     setNotice("");
     setConfirmingId(null);
+    setSelectedId(null);
     setEditingId(null);
     setForm(emptyForm);
     setFileName("");
     setShowForm(true);
+    router.replace("/dashboard/challenges?create=1", { scroll: false });
   }
 
   function startEdit(challenge) {
     setError("");
     setNotice("");
     setConfirmingId(null);
+    setSelectedId(null);
     setEditingId(challenge.id);
     setForm({
       title: challenge.title,
@@ -166,6 +208,7 @@ export default function DashboardChallengesPage() {
     });
     setFileName("");
     setShowForm(true);
+    clearQuery();
   }
 
   function saveChallenge(event) {
@@ -254,6 +297,10 @@ export default function DashboardChallengesPage() {
     saveDb(next);
     setDb(next);
     setConfirmingId(null);
+    if (selectedId === id) {
+      setSelectedId(null);
+      clearQuery();
+    }
     setNotice("Tantangan berhasil dihapus beserta submisinya.");
   }
 
@@ -261,6 +308,7 @@ export default function DashboardChallengesPage() {
     setError("");
     setNotice("");
     setConfirmingId(null);
+    setShowForm(false);
     setSelectedId(id);
     const target = db.challenges.find((item) => item.id === id);
     setWinnerDraft({
@@ -268,6 +316,12 @@ export default function DashboardChallengesPage() {
       second: target?.winners?.second ?? null,
       third: target?.winners?.third ?? null,
     });
+    router.replace(`/dashboard/challenges?challenge=${id}`, { scroll: false });
+  }
+
+  function closeManage() {
+    setSelectedId(null);
+    clearQuery();
   }
 
   function setWinner(key, artworkId) {
@@ -301,62 +355,67 @@ export default function DashboardChallengesPage() {
     setNotice("Pemenang berhasil disimpan.");
   }
 
-  const statusLabels = {
-    active: "Aktif",
-    upcoming: "Mendatang",
-    ended: "Selesai",
-  };
-
-  const winnerRanks = [
-    { key: "first", label: "Juara 1" },
-    { key: "second", label: "Juara 2" },
-    { key: "third", label: "Juara 3" },
-  ];
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchParams.get("create") === "1") {
+        setError("");
+        setNotice("");
+        setConfirmingId(null);
+        setSelectedId(null);
+        setEditingId(null);
+        setForm(emptyForm);
+        setFileName("");
+        setShowForm(true);
+      }
+      const challengeId = searchParams.get("challenge");
+      if (challengeId) {
+        setError("");
+        setNotice("");
+        setConfirmingId(null);
+        setShowForm(false);
+        setSelectedId(challengeId);
+        const target = db.challenges.find((item) => item.id === challengeId);
+        setWinnerDraft({
+          first: target?.winners?.first ?? null,
+          second: target?.winners?.second ?? null,
+          third: target?.winners?.third ?? null,
+        });
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [searchParams, db.challenges]);
 
   return (
     <>
-      <header className="space-y-2">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+      <header className="border-b hairline pb-7">
+        <div className="label flex items-center gap-3 text-wine">
+          <span className="h-px w-8 bg-wine" />
           Kurator
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Tantangan saya</h1>
-        <p className="text-sm leading-relaxed text-ink/55">
-          Kelola tantangan yang Anda selenggarakan.
+        </div>
+        <h1 className="font-display mt-5 text-[38px] leading-none sm:text-[48px]">Tantangan saya.</h1>
+        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/65">
+          Kelola tantangan yang Anda selenggarakan, submisi yang masuk, dan pemenangnya.
         </p>
       </header>
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-ink/50">{challenges.length} tantangan</p>
-        <button
-          type="button"
-          onClick={startCreate}
-          className="bg-ink px-4 py-2.5 text-xs font-medium text-paper transition-colors hover:bg-brand"
-        >
-          Buat tantangan
+        <p className="label text-ink/65">{challenges.length} tantangan</p>
+        <button type="button" onClick={startCreate} className="btn btn-ink btn-sm">
+          <i className="fa-solid fa-plus" /> Buat tantangan
         </button>
       </div>
 
-      {showForm && (
-        <form
-          onSubmit={saveChallenge}
-          className="space-y-4 border border-ink/15 bg-white p-4"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              {editingId ? "Edit tantangan" : "Tantangan baru"}
-            </p>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-            >
-              Batal
-            </button>
-          </div>
+      <Modal
+        open={showForm}
+        onClose={resetForm}
+        subtitle={editingId ? "Perbarui tantangan" : "Tantangan baru"}
+        title={editingId ? "Edit tantangan" : "Buat tantangan"}
+      >
+        <form onSubmit={saveChallenge} className="space-y-5">
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block space-y-1 text-xs text-ink/60">
-              Judul tantangan
+            <label className="block">
+              <span className="label">Judul tantangan</span>
               <input
                 type="text"
                 required
@@ -365,11 +424,11 @@ export default function DashboardChallengesPage() {
                   setForm((current) => ({ ...current, title: event.target.value }))
                 }
                 placeholder="Judul tantangan"
-                className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+                className="field mt-2"
               />
             </label>
-            <label className="block space-y-1 text-xs text-ink/60">
-              Hadiah
+            <label className="block">
+              <span className="label">Hadiah</span>
               <input
                 type="text"
                 required
@@ -378,11 +437,11 @@ export default function DashboardChallengesPage() {
                   setForm((current) => ({ ...current, prize: event.target.value }))
                 }
                 placeholder="Hadiah tantangan"
-                className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+                className="field mt-2"
               />
             </label>
-            <label className="block space-y-1 text-xs text-ink/60">
-              Tanggal mulai
+            <label className="block">
+              <span className="label">Tanggal mulai</span>
               <input
                 type="date"
                 required
@@ -390,11 +449,11 @@ export default function DashboardChallengesPage() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, startDate: event.target.value }))
                 }
-                className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none focus:border-ink"
+                className="field mt-2"
               />
             </label>
-            <label className="block space-y-1 text-xs text-ink/60">
-              Tanggal selesai
+            <label className="block">
+              <span className="label">Tanggal selesai</span>
               <input
                 type="date"
                 required
@@ -402,13 +461,13 @@ export default function DashboardChallengesPage() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, endDate: event.target.value }))
                 }
-                className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none focus:border-ink"
+                className="field mt-2"
               />
             </label>
           </div>
 
-          <label className="block space-y-1 text-xs text-ink/60">
-            Deskripsi
+          <label className="block">
+            <span className="label">Deskripsi</span>
             <textarea
               required
               rows={4}
@@ -417,12 +476,12 @@ export default function DashboardChallengesPage() {
                 setForm((current) => ({ ...current, description: event.target.value }))
               }
               placeholder="Deskripsi tantangan"
-              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+              className="field mt-2"
             />
           </label>
 
-          <label className="block space-y-1 text-xs text-ink/60">
-            Aturan
+          <label className="block">
+            <span className="label">Aturan</span>
             <textarea
               required
               rows={4}
@@ -431,12 +490,12 @@ export default function DashboardChallengesPage() {
                 setForm((current) => ({ ...current, rules: event.target.value }))
               }
               placeholder="Aturan tantangan"
-              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+              className="field mt-2"
             />
           </label>
 
-          <label className="block space-y-1 text-xs text-ink/60">
-            Banner (URL atau upload gambar)
+          <label className="block">
+            <span className="label">Banner (URL atau upload gambar)</span>
             <input
               type="text"
               value={form.banner}
@@ -444,73 +503,60 @@ export default function DashboardChallengesPage() {
                 setForm((current) => ({ ...current, banner: event.target.value }))
               }
               placeholder="https://... atau data URL"
-              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+              className="field mt-2"
             />
             <input
               type="file"
               accept="image/*"
               onChange={pickBanner}
-              className="mt-2 w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none focus:border-ink"
+              className="field mt-3"
             />
-            {fileName && (
-              <p className="mt-1 text-[11px] text-ink/55">{fileName}</p>
-            )}
+            {fileName && <p className="label mt-2 text-ink/55">{fileName}</p>}
           </label>
 
-          <button
-            type="submit"
-            className="bg-ink px-4 py-2.5 text-xs font-medium text-paper transition-colors hover:bg-brand"
-          >
-            {editingId ? "Simpan perubahan" : "Buat tantangan"}
-          </button>
-        </form>
-      )}
-
-      {error && (
-        <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
-        </p>
-      )}
-      {notice && <p className="text-xs text-ink/55">{notice}</p>}
-
-      {confirming && (
-        <div className="border-l-2 border-red-600 bg-red-50 px-3 py-2.5 text-xs text-red-700">
-          <p>Hapus &quot;{confirming.title}&quot;? Submisinya ikut dihapus.</p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => deleteChallenge(confirming.id)}
-              className="bg-red-700 px-3 py-1.5 text-xs text-white hover:bg-red-800"
-            >
-              Ya, hapus
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingId(null)}
-              className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-            >
-              Batal
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button type="button" onClick={resetForm} className="btn btn-outline btn-sm">Batal</button>
+            <button type="submit" className="btn btn-ink btn-sm">
+              {editingId ? "Simpan perubahan" : "Buat tantangan"}
             </button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
-      <div className="border border-ink/15 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-ink/15 bg-paper text-[10px] uppercase tracking-[0.12em] text-ink/45">
+      {error && <p className="border-l-2 border-wine bg-wine/5 px-3 py-2 text-[13px] text-wine">{error}</p>}
+      {notice && <p className="label text-wine">{notice}</p>}
+
+      <ConfirmDialog
+        open={Boolean(confirming)}
+        onClose={() => setConfirmingId(null)}
+        onConfirm={() => deleteChallenge(confirming.id)}
+        title="Hapus tantangan"
+        subtitle="Kurator"
+        message={
+          confirming
+            ? `Hapus "${confirming.title}"? Semua submisi untuk tantangan ini ikut dihapus.`
+            : ""
+        }
+        danger
+        confirmLabel="Ya, hapus"
+      />
+
+      <div className="border hairline bg-white">
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-medium">Tantangan</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Submisi</th>
-                <th className="px-4 py-3 font-medium">Periode</th>
-                <th className="px-4 py-3 text-right font-medium">Aksi</th>
+                <th>Tantangan</th>
+                <th>Status</th>
+                <th>Submisi</th>
+                <th>Periode</th>
+                <th className="text-right">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {challenges.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-ink/45">
+                  <td colSpan={5} className="py-10 text-center text-ink/55">
                     Belum ada tantangan. Buat tantangan pertama Anda.
                   </td>
                 </tr>
@@ -520,33 +566,27 @@ export default function DashboardChallengesPage() {
                   const submissionCount = submissionCounts[challenge.id] ?? 0;
 
                   return (
-                    <tr
-                      key={challenge.id}
-                      className="border-b border-ink/10 last:border-b-0"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{challenge.title}</p>
-                        <p className="text-xs text-ink/50">{challenge.prize}</p>
+                    <tr key={challenge.id}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <img src={challenge.banner} alt="" className="h-12 w-16 object-cover" />
+                          <div>
+                            <p className="font-semibold">{challenge.title}</p>
+                            <p className="label mt-1 text-ink/55">{challenge.prize}</p>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-ink/60">{statusLabels[status]}</td>
-                      <td className="px-4 py-3 text-ink/60">{submissionCount}</td>
-                      <td className="px-4 py-3 text-ink/60">
+                      <td><span className={`status ${statusClasses[status]}`}>{statusLabels[status]}</span></td>
+                      <td className="text-ink/65">{submissionCount}</td>
+                      <td className="text-ink/65">
                         {formatDate(challenge.startDate)} — {formatDate(challenge.endDate)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td>
                         <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openManage(challenge.id)}
-                            className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-                          >
+                          <button type="button" onClick={() => openManage(challenge.id)} className="btn btn-outline btn-sm">
                             Submisi
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => startEdit(challenge)}
-                            className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-                          >
+                          <button type="button" onClick={() => startEdit(challenge)} className="btn btn-outline btn-sm">
                             Edit
                           </button>
                           <button
@@ -556,7 +596,7 @@ export default function DashboardChallengesPage() {
                               setNotice("");
                               setConfirmingId(challenge.id);
                             }}
-                            className="border border-red-600/50 px-3 py-1.5 text-xs text-red-700 transition-colors hover:bg-red-50"
+                            className="btn btn-outline btn-sm !border-wine/40 !text-wine"
                           >
                             Hapus
                           </button>
@@ -571,130 +611,131 @@ export default function DashboardChallengesPage() {
         </div>
       </div>
 
-      {selected && (
-        <section className="space-y-5 border border-ink/15 bg-white p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                Kurator
-              </p>
-              <h2 className="text-xl font-semibold">Kelola submisi</h2>
-              <p className="text-sm text-ink/55">{selected.title}</p>
+      <Modal
+        open={Boolean(selected)}
+        onClose={closeManage}
+        title="Kelola submisi."
+        subtitle="Kurator"
+        maxWidth="max-w-5xl"
+      >
+        {selected && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b hairline pb-5">
+              <p className="text-[14px] text-ink/65">{selected.title}</p>
+              <div className="flex items-center gap-3">
+                <span className={`status ${statusClasses[getStatus(selected)]}`}>
+                  {statusLabels[getStatus(selected)]}
+                </span>
+                <button type="button" onClick={closeManage} className="btn btn-outline btn-sm">Tutup</button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="border border-ink/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-ink/60">
-                {statusLabels[getStatus(selected)]}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedId(null)}
-                className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
 
-          <div className="space-y-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              Galeri partisipan
-            </p>
-            {selectedEntries.length === 0 ? (
-              <p className="border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
-                Belum ada karya yang disubmit.
-              </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="card p-4">
+                <p className="label text-ink/65">Periode</p>
+                <p className="mt-2 text-[14px] font-semibold">
+                  {formatDate(selected.startDate)} — {formatDate(selected.endDate)}
+                </p>
+              </div>
+              <div className="card p-4">
+                <p className="label text-ink/65">Submisi masuk</p>
+                <p className="mt-2 text-[14px] font-semibold">{selectedEntries.length} karya</p>
+              </div>
+              <div className="card p-4">
+                <p className="label text-ink/65">Pemenang</p>
+                <p className="mt-2 text-[14px] font-semibold">
+                  {winnerRanks.filter((rank) => selected.winners?.[rank.key]).length} dari 3 ditandai
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="label text-ink/65">Galeri partisipan</p>
+              {selectedEntries.length === 0 ? (
+                <div className="border border-dashed border-ink/20 p-8 text-center text-[14px] text-ink/55">
+                  Belum ada karya yang disubmit.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                  {selectedEntries.map((entry) => (
+                    <article key={entry.submission.id} className="art-card border hairline bg-white">
+                      <div className="art-media">
+                        <img
+                          src={entry.artwork.image}
+                          alt={entry.artwork.title}
+                          loading="lazy"
+                          className="art-img aspect-[4/5] w-full object-cover"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <h3 className="text-[14px] font-semibold leading-snug">{entry.artwork.title}</h3>
+                        <p className="label mt-1 text-ink/55">{entry.submitter?.name ?? "Kreator"}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {getStatus(selected) === "ended" ? (
+              <div className="space-y-5 border-t hairline pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="label text-wine">Pemenang</div>
+                    <h3 className="font-display mt-3 text-[28px] leading-none">Pilih pemenang.</h3>
+                    <p className="mt-2 text-[14px] text-ink/65">
+                      Challenge sudah berakhir. Pilih maksimal tiga karya sebagai pemenang.
+                    </p>
+                  </div>
+                  <button type="button" onClick={saveWinners} className="btn btn-ink btn-sm">
+                    Simpan pemenang
+                  </button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {winnerRanks.map((rank) => {
+                    const assignedArtworkId = winnerDraft[rank.key];
+                    const options = winnerOptions
+                      .filter(
+                        (entry) =>
+                          entry.artwork &&
+                          (assignedArtworkId === entry.artwork.id ||
+                            !usedWinnerArtworkIds.has(entry.artwork.id)),
+                      )
+                      .map((entry) => ({
+                        artworkId: entry.artwork.id,
+                        title: entry.artwork.title,
+                      }));
+
+                    return (
+                      <label key={rank.key} className="block">
+                        <span className="label text-ink/65">{rank.label}</span>
+                        <select
+                          value={assignedArtworkId ?? ""}
+                          onChange={(event) =>
+                            setWinner(rank.key, event.target.value || null)
+                          }
+                          className="field mt-2"
+                        >
+                          <option value="">Belum dipilih</option>
+                          {options.map((option) => (
+                            <option key={option.artworkId} value={option.artworkId}>
+                              {option.title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {selectedEntries.map((entry) => (
-                  <article key={entry.submission.id} className="border border-ink/15 bg-white">
-                    <div className="aspect-[4/5] overflow-hidden bg-ink/5">
-                      <img
-                        src={entry.artwork.image}
-                        alt={entry.artwork.title}
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <h3 className="text-sm font-medium leading-snug">
-                        {entry.artwork.title}
-                      </h3>
-                      <p className="mt-1 text-xs text-ink/55">
-                        {entry.submitter?.name ?? "Kreator"}
-                      </p>
-                    </div>
-                  </article>
-                ))}
+              <div className="border border-dashed border-ink/20 p-4 text-[14px] text-ink/55">
+                Pemilihan pemenang dibuka setelah tanggal selesai.
               </div>
             )}
           </div>
-
-          {getStatus(selected) === "ended" ? (
-            <div className="space-y-4 border-t border-ink/10 pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                    Pemenang
-                  </p>
-                  <h3 className="mt-1 text-xl font-semibold">Pilih pemenang</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={saveWinners}
-                  className="bg-ink px-4 py-2.5 text-xs font-medium text-paper transition-colors hover:bg-brand"
-                >
-                  Simpan pemenang
-                </button>
-              </div>
-              <p className="text-xs text-ink/50">
-                Challenge sudah berakhir. Pilih maksimal tiga karya sebagai pemenang.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-3">
-                {winnerRanks.map((rank) => {
-                  const assignedArtworkId = winnerDraft[rank.key];
-                  const options = winnerOptions
-                    .filter(
-                      (entry) =>
-                        entry.artwork &&
-                        (assignedArtworkId === entry.artwork.id ||
-                          !usedWinnerArtworkIds.has(entry.artwork.id)),
-                    )
-                    .map((entry) => ({
-                      artworkId: entry.artwork.id,
-                      title: entry.artwork.title,
-                    }));
-
-                  return (
-                    <label key={rank.key} className="block space-y-2 text-xs text-ink/60">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-ink/45">
-                        {rank.label}
-                      </span>
-                      <select
-                        value={assignedArtworkId ?? ""}
-                        onChange={(event) =>
-                          setWinner(rank.key, event.target.value || null)
-                        }
-                        className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none focus:border-ink"
-                      >
-                        <option value="">Belum dipilih</option>
-                        {options.map((option) => (
-                          <option key={option.artworkId} value={option.artworkId}>
-                            {option.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <p className="border border-dashed border-ink/20 p-4 text-xs text-ink/55">
-              Pemilihan pemenang dibuka setelah tanggal selesai.
-            </p>
-          )}
-        </section>
-      )}
+        )}
+      </Modal>
     </>
   );
 }

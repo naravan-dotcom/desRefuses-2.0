@@ -1,77 +1,11 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import ArtworkCard from "@/components/artwork-card";
 import { loadDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
-
-const timeline = [
-  {
-    year: "1863",
-    place: "Paris",
-    title: "Penolakan Juri",
-    text: "Salon (ruang) resmi menutup pintu bagi sebagian besar karya yang diajukan.",
-  },
-  {
-    year: "1863",
-    place: "Pameran",
-    title: "Pembentukan ruang baru",
-    text: "Salon des Refusés memberi karya yang ditolak sebuah ruang untuk dilihat.",
-  },
-  {
-    year: "2026",
-    place: "Web",
-    title: "Modernisasi",
-    text: "desRefusés 2.0 memindahkan semangat itu ke galeri digital tanpa seleksi.",
-  },
-];
-
-const principles = [
-  {
-    num: "01",
-    title: "Hak untuk dilihat",
-    text: "Karya tampil di galeri utama tanpa antrean seleksi kurator. Tidak ada dewan juri yang menentukan kelayakan tampil.",
-  },
-  {
-    num: "02",
-    title: "Publik yang menilai",
-    text: "Apresiasi tumbuh dari respons komunitas — suka, komentar, simpan, dan perhatian yang nyata. Bukan dari stempel satu meja.",
-  },
-  {
-    num: "03",
-    title: "Kekuasaan yang terbatas",
-    text: "Kurator mengelola tantangan miliknya. Admin menjaga etika dan verifikasi. Tidak ada satu peran yang memiliki seluruh galeri.",
-  },
-  {
-    num: "04",
-    title: "Menjunjung etika",
-    text: "Kebebasan ekspresi tetap menghormati batas: tanpa plagiarisme, kebencian, pelecehan, atau konten yang membahayakan.",
-  },
-];
-
-const roles = [
-  {
-    num: "01",
-    label: "Member",
-    title: "Kreator",
-    text: "Memajang karya tanpa sensor juri, mengelola portofolio, berinteraksi, menyimpan favorit, dan melaporkan konten yang melanggar.",
-    tags: ["Unggah karya", "Berkomentar", "Melapor"],
-  },
-  {
-    num: "02",
-    label: "Kurator",
-    title: "Penyelenggara",
-    text: "Mengelola tantangan sukarela setelah disetujui admin. Kuasanya terbatas pada ruang acara sendiri, bukan pada galeri utama.",
-    tags: ["Tantangan", "Submisi", "Pemenang"],
-  },
-  {
-    num: "03",
-    label: "Admin",
-    title: "Konservator",
-    text: "Memverifikasi kurator, mengelola kategori, dan menindak laporan berdasarkan etika komunitas. Bukan penentu selera seni.",
-    tags: ["Verifikasi", "Moderasi", "Kategori"],
-  },
-];
+import { useSession } from "@/lib/use-session";
 
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -82,445 +16,424 @@ function todayStr() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function formatDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+function artCode(artwork) {
+  const digits = String(artwork?.id || "").replace(/\D/g, "");
+  return digits ? `No. ${digits.padStart(2, "0")}` : `No. ${String(artwork?.id || "").slice(-2).toUpperCase()}`;
 }
 
-function ArtworkCard({ artwork, creator, category }) {
+function formatDateId(value) {
+  if (!value) return "—";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function ChallengeCard({ challenge, curator, submissions }) {
+  const daysLeft = Math.max(0, Math.ceil((new Date(`${challenge.endDate}T23:59:59`) - new Date()) / 86400000));
   return (
-    <Link
-      href={`/artwork/${artwork.id}`}
-      className="group block border border-ink/15 bg-white transition-colors hover:border-ink/40"
-    >
-      <div className="aspect-[4/5] overflow-hidden bg-ink/5">
-        <img
-          src={artwork.image}
-          alt={`Karya ${artwork.title} oleh ${creator ?? "kreator"}`}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-        />
+    <Link href={`/challenges/${challenge.id}`} className="group block">
+      <div className="challenge-media relative aspect-[4/5] overflow-hidden bg-ink">
+        <img src={challenge.banner} alt={challenge.title} loading="lazy" className="art-img h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/65 via-transparent to-transparent" />
+        <span className="status status-approved absolute left-4 top-4">Berlangsung</span>
+        <span className="absolute bottom-4 right-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/40 text-paper transition-transform duration-300 group-hover:translate-x-1">
+          <i className="fa-solid fa-arrow-right text-[12px]" />
+        </span>
       </div>
-      <div className="p-3">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-          {category ?? "Tanpa kategori"}
-        </p>
-        <h3 className="mt-1 text-sm font-medium leading-snug">{artwork.title}</h3>
-        <p className="mt-1 text-xs text-ink/55">{creator ?? "kreator"}</p>
-        <div className="mt-3 border-t border-ink/10 pt-2 text-[10px] uppercase tracking-[0.12em] text-ink/45">
-          {artwork.likes} suka
+      <div className="pt-5">
+        <div className="flex items-center justify-between gap-3 text-[11px] font-label uppercase tracking-[0.18em] text-ink/65">
+          <span>{curator ?? "Kurator"}</span>
+          <span>{daysLeft > 0 ? `${daysLeft} hari lagi` : "Hari terakhir"}</span>
+        </div>
+        <h3 className="font-display mt-3 text-[29px] leading-[1.12] tracking-[-0.01em] transition-colors group-hover:text-wine">
+          {challenge.title}
+        </h3>
+        <p className="mt-2.5 line-clamp-2 text-[14px] leading-relaxed text-ink/65">{challenge.description}</p>
+        <div className="mt-4 flex items-center justify-between border-t hairline pt-3 text-[12px] font-label text-ink/65">
+          <span>{submissions} karya</span>
+          <span>{formatDateId(challenge.endDate)}</span>
         </div>
       </div>
     </Link>
   );
 }
 
-function ChallengeCard({ challenge, curator, submissions }) {
-  return (
-    <article className="border border-ink/15 bg-white">
-      <div className="aspect-[16/7] overflow-hidden bg-ink/5">
-        <img
-          src={challenge.banner}
-          alt={challenge.title}
-          loading="lazy"
-          className="h-full w-full object-cover"
-        />
-      </div>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            {curator ?? "Kurator"}
-          </p>
-          <span className="border border-ink/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-ink/60">
-            Aktif
-          </span>
-        </div>
-        <h3 className="mt-2 text-base font-medium">{challenge.title}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-ink/60">
-          {challenge.description}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-3 border-t border-ink/10 pt-3 text-[10px] uppercase tracking-[0.12em] text-ink/45">
-          <span>{submissions} submisi</span>
-          <span>
-            {formatDate(challenge.startDate)} — {formatDate(challenge.endDate)}
-          </span>
-        </div>
-      </div>
-    </article>
-  );
-}
-
 export default function HomePage() {
   const [db, setDb] = useState(() => createSeedDb());
   const [query, setQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("Semua");
+  const [categoryId, setCategoryId] = useState("all");
+  const [sort, setSort] = useState("popular");
+  const { user } = useSession();
 
   useEffect(() => {
     const timer = setTimeout(() => setDb(loadDb()), 0);
     return () => clearTimeout(timer);
   }, []);
 
-  const categories = useMemo(
-    () => ["Semua", ...db.categories.map((category) => category.name)],
-    [db],
-  );
-
-  const categoryIds = useMemo(
-    () =>
-      Object.fromEntries(db.categories.map((category) => [category.name, category.id])),
-    [db],
-  );
-
-  const categoryNames = useMemo(
-    () => Object.fromEntries(db.categories.map((category) => [category.id, category.name])),
-    [db],
-  );
-
-  const creators = useMemo(
-    () => Object.fromEntries(db.users.map((user) => [user.id, user.name])),
-    [db],
-  );
-
-  const submissionCounts = useMemo(
-    () =>
-      db.submissions.reduce((counts, submission) => {
-        counts[submission.challengeId] = (counts[submission.challengeId] ?? 0) + 1;
-        return counts;
-      }, {}),
-    [db],
-  );
-
-  const activeName = categories.includes(activeCategory) ? activeCategory : "Semua";
-
-  const matchingArtworks = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const categoryId = categoryIds[activeName];
-
-    return db.artworks.filter((artwork) => {
-      if (activeName !== "Semua" && artwork.categoryId !== categoryId) return false;
-      if (!needle) return true;
-      return [artwork.title, creators[artwork.userId] ?? ""].some((value) =>
-        String(value).toLowerCase().includes(needle),
-      );
-    });
-  }, [db, query, activeName, categoryIds, creators]);
-
-  const popularArtworks = useMemo(
-    () =>
-      [...matchingArtworks]
-        .sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0))
-        .slice(0, 4),
-    [matchingArtworks],
-  );
-
-  const latestArtworks = useMemo(
-    () =>
-      [...matchingArtworks]
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 4),
-    [matchingArtworks],
-  );
+  const categories = useMemo(() => db.categories ?? [], [db]);
+  const users = useMemo(() => Object.fromEntries((db.users ?? []).map((item) => [item.id, item])), [db]);
+  const categoryNames = useMemo(() => Object.fromEntries(categories.map((item) => [item.id, item.name])), [categories]);
+  const memberCount = useMemo(() => (db.users ?? []).filter((item) => item.role === "member").length, [db]);
+  const commentCounts = useMemo(() => {
+    return (db.comments ?? []).reduce((counts, comment) => {
+      counts[comment.artworkId] = (counts[comment.artworkId] ?? 0) + 1;
+      return counts;
+    }, {});
+  }, [db]);
+  const submissionCounts = useMemo(() => {
+    return (db.submissions ?? []).reduce((counts, submission) => {
+      counts[submission.challengeId] = (counts[submission.challengeId] ?? 0) + 1;
+      return counts;
+    }, {});
+  }, [db]);
 
   const activeChallenges = useMemo(() => {
     const today = todayStr();
-    const needle = query.trim().toLowerCase();
+    return (db.challenges ?? []).filter((challenge) => challenge.startDate <= today && challenge.endDate >= today);
+  }, [db]);
 
-    return db.challenges.filter((challenge) => {
-      if (challenge.startDate > today || challenge.endDate < today) return false;
+  const filteredArtworks = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    let list = (db.artworks ?? []).filter((artwork) => {
+      if (categoryId !== "all" && artwork.categoryId !== categoryId) return false;
       if (!needle) return true;
-      return [challenge.title, challenge.description].some((value) =>
-        String(value).toLowerCase().includes(needle),
-      );
+      const creator = users[artwork.userId];
+      return [artwork.title, artwork.description, ...(artwork.tags ?? []), creator?.name, creator?.username]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
     });
-  }, [db, query]);
+    list = [...list].sort((a, b) => {
+      if (sort === "popular") return (b.likes ?? 0) - (a.likes ?? 0);
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    return list;
+  }, [db, query, categoryId, sort, users]);
+
+  const sortedByLikes = useMemo(
+    () => [...(db.artworks ?? [])].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0)),
+    [db],
+  );
+  const featured = sortedByLikes[0];
+  const secondary = sortedByLikes[1] ?? featured;
+  const matchingChallenges = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return activeChallenges;
+    return activeChallenges.filter((challenge) =>
+      `${challenge.title} ${challenge.description}`.toLowerCase().includes(needle),
+    );
+  }, [activeChallenges, query]);
+
+  function scrollToGallery() {
+    document.getElementById("galeri")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function resetFilters() {
+    setQuery("");
+    setCategoryId("all");
+  }
 
   return (
-    <main className="px-6 py-16 sm:px-10">
-      <div className="mx-auto max-w-6xl space-y-14">
-        <section className="space-y-4">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Arsip fondasi / 1863—2026
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Penolakan yang melahirkan ruang.
-          </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-ink/55">
-            Pada 1863, juri Salon resmi Paris menolak sebagian besar karya yang
-            diajukan. Protes itu membuka <span className="font-medium text-ink">Salon des Refusés</span> — pameran bagi karya yang tidak diterima institusi.
-          </p>
-          <p className="max-w-2xl text-sm leading-relaxed text-ink/55">
-            Nilai sebuah karya tidak seharusnya ditentukan oleh satu meja juri.
-            Hak untuk dilihat tidak boleh dimonopoli satu pihak.
-          </p>
-          <div className="flex flex-wrap gap-8 pt-2">
-            <div>
-              <p className="text-2xl font-semibold">{db.artworks.length}</p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                Karya dipajang
-              </p>
-            </div>
-            <div>
-              <p className="text-2xl font-semibold">{activeChallenges.length}</p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                Tantangan aktif
-              </p>
-            </div>
-            <div>
-              <p className="text-2xl font-semibold">0</p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                Juri utama
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section id="jelajah" className="scroll-mt-24 space-y-4">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Jelajah galeri
-          </p>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Cari karya atau tantangan.
-          </h2>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <input
-              type="text"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari judul karya, kreator, atau challenge"
-              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink sm:max-w-sm"
-            />
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <button
-                  type="button"
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                    category === activeName
-                      ? "border-ink bg-ink text-paper"
-                      : "border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                Paling disukai
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                Karya populer
-              </h2>
-            </div>
-            <Link
-              href="/gallery"
-              className="text-[10px] uppercase tracking-[0.16em] text-ink/45 hover:text-ink"
-            >
-              Lihat semua
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {popularArtworks.map((artwork) => (
-              <ArtworkCard
-                key={artwork.id}
-                artwork={artwork}
-                creator={creators[artwork.userId]}
-                category={categoryNames[artwork.categoryId]}
-              />
-            ))}
-            {popularArtworks.length === 0 && (
-              <p className="col-span-full border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
-                Tidak ada karya yang cocok.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                Terbaru
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                Karya terbaru
-              </h2>
-            </div>
-            <Link
-              href="/gallery"
-              className="text-[10px] uppercase tracking-[0.16em] text-ink/45 hover:text-ink"
-            >
-              Lihat semua
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {latestArtworks.map((artwork) => (
-              <ArtworkCard
-                key={artwork.id}
-                artwork={artwork}
-                creator={creators[artwork.userId]}
-                category={categoryNames[artwork.categoryId]}
-              />
-            ))}
-            {latestArtworks.length === 0 && (
-              <p className="col-span-full border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
-                Tidak ada karya yang cocok.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                Tantangan aktif
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                Ruang yang sedang berjalan.
-              </h2>
-            </div>
-            <Link
-              href="/challenges"
-              className="text-[10px] uppercase tracking-[0.16em] text-ink/45 hover:text-ink"
-            >
-              Lihat semua
-            </Link>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {activeChallenges.map((challenge) => (
-              <ChallengeCard
-                key={challenge.id}
-                challenge={challenge}
-                curator={creators[challenge.curatorId]}
-                submissions={submissionCounts[challenge.id] ?? 0}
-              />
-            ))}
-            {activeChallenges.length === 0 && (
-              <p className="col-span-full border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
-                Tidak ada tantangan aktif yang cocok.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <div className="mx-auto max-w-4xl space-y-14">
-          <section className="space-y-4">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              Kronologi
+    <main className="page-enter">
+      <section className="border-b hairline">
+        <div className="mx-auto grid max-w-[1240px] items-center gap-10 px-5 pb-14 pt-10 lg:grid-cols-12 lg:gap-16 lg:px-10 lg:pb-20 lg:pt-14">
+          <div className="lg:col-span-7">
+            <p className="label" data-reveal>Salon des Refusés · MDCCCLXIII</p>
+            <h1 className="font-display mt-5 text-[44px] leading-[1.06] sm:text-[58px] lg:text-[70px]" data-reveal>
+              Karya yang ditolak juri, dikenang sejarah.
+            </h1>
+            <p className="mt-6 max-w-[34rem] text-[17px] leading-[1.7] text-ink/80" data-reveal>
+              Platform seni digital yang membalik sejarah. Tanpa dewan juri, tanpa antrean seleksi. Publik yang mengapresiasi, kreator yang berkuasa penuh atas karyanya.
             </p>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Dari pintu tertutup ke dinding terbuka.
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-3">
-              {timeline.map((item, index) => (
-                <div key={index} className="border border-ink/15 bg-white p-5">
-                  <p className="text-2xl font-semibold text-ink/30">{item.year}</p>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                    {item.place}
-                  </p>
-                  <p className="mt-3 text-sm font-medium">{item.title}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-ink/60">
-                    {item.text}
-                  </p>
-                </div>
-              ))}
+            <div className="mt-8 flex flex-wrap items-center gap-3" data-reveal>
+              <button type="button" onClick={scrollToGallery} className="btn btn-ink">Jelajahi galeri</button>
+              <Link href="/challenges" className="btn btn-outline">Lihat tantangan</Link>
+              {user?.role === "member" && (
+                <Link href="/dashboard/artworks" className="btn btn-acid">Unggah karya</Link>
+              )}
             </div>
-          </section>
-
-          <section id="prinsip" className="scroll-mt-24 space-y-4">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              Prinsip
-            </p>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Empat hal yang kami jaga.
-            </h2>
-            <p className="max-w-2xl text-sm leading-relaxed text-ink/55">
-              Bukan janji bahwa semua karya akan disukai. Janji bahwa tidak ada
-              karya yang boleh dihalangi hanya karena selera seseorang.
-            </p>
-            <div className="space-y-3">
-              {principles.map((item) => (
-                <div key={item.num} className="border border-ink/15 bg-white p-5">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                    {item.num}
-                  </p>
-                  <p className="mt-1 text-sm font-medium">{item.title}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-ink/60">
-                    {item.text}
-                  </p>
-                </div>
-              ))}
+            <div className="mt-12 grid max-w-[34rem] grid-cols-3 gap-6 border-t hairline pt-6">
+              <div>
+                <div className="font-display text-[36px] leading-none">{db.artworks?.length ?? 0}</div>
+                <div className="label mt-2">Karya terpajang</div>
+              </div>
+              <div>
+                <div className="font-display text-[36px] leading-none">{memberCount}</div>
+                <div className="label mt-2">Kreator</div>
+              </div>
+              <div>
+                <div className="font-display text-[36px] leading-none text-wine">{activeChallenges.length}</div>
+                <div className="label mt-2">Tantangan aktif</div>
+              </div>
             </div>
-          </section>
-
-          <section id="peran" className="scroll-mt-24 space-y-4">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              Division of Power
-            </p>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Desentralisasi Kekuasaan.
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-3">
-              {roles.map((item) => (
-                <div key={item.num} className="border border-ink/15 bg-white p-5">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                    {item.label}
-                  </p>
-                  <p className="mt-1 text-sm font-medium">{item.title}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-ink/60">
-                    {item.text}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {item.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="border border-ink/15 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-ink/50"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+          </div>
+          <div className="lg:col-span-5">
+            {featured && (
+              <>
+                <Link href={`/artwork/${featured.id}`} className="art-media block aspect-[4/5]">
+                  <img src={featured.image} alt={featured.title} className="art-img h-full w-full object-cover" />
+                </Link>
+                <div className="border-b hairline pb-4 pt-4">
+                  <div className="label">Karya paling diapresiasi · {artCode(featured)}</div>
+                  <div className="font-display mt-1.5 text-[26px] leading-[1.15]">{featured.title}</div>
+                  <div className="mt-1 text-[15px] text-ink/70">
+                    {users[featured.userId]?.name ?? "Kreator"}, {featured.likes ?? 0} suka
                   </div>
                 </div>
+              </>
+            )}
+            {secondary && (
+              <Link href={`/artwork/${secondary.id}`} className="group flex items-center gap-4 pt-4">
+                <img src={secondary.image} alt="" className="h-14 w-14 shrink-0 object-cover" />
+                <div className="min-w-0">
+                  <div className="label">Karya kedua</div>
+                  <div className="font-display text-[19px] leading-tight transition-colors group-hover:text-wine">{secondary.title}</div>
+                  <div className="text-[14px] text-ink/70">{users[secondary.userId]?.name ?? "Kreator"}</div>
+                </div>
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div className="border-b hairline bg-canvas">
+        <p className="font-serif-italic mx-auto max-w-[1240px] px-5 py-5 text-center text-[20px] text-ink/80 lg:px-10">
+          Tanpa juri seleksi. Karya Anda, hak Anda untuk dilihat.
+        </p>
+      </div>
+
+      <section className="mx-auto max-w-[1240px] px-5 py-16 lg:px-10 lg:py-24">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+          <div className="lg:col-span-3" data-reveal>
+            <div className="label flex items-center gap-4 text-ink/65"><span>Kronologi</span></div>
+            <h2 className="font-display mt-6 text-[31px] leading-[1.12]">
+              Dari pintu tertutup ke dinding terbuka.
+            </h2>
+            <p className="mt-5 max-w-xs text-[14px] leading-relaxed text-ink/65">
+              Sejarah singkat gagasan yang terus berpindah bentuk, dari salon Paris ke galeri digital.
+            </p>
+          </div>
+          <div className="grid gap-8 sm:grid-cols-3 lg:col-span-9" data-reveal data-reveal-delay="1">
+            {[
+              ["1863", "Paris", "Juri menolak", "Salon resmi menutup pintu bagi sebagian besar karya yang diajukan."],
+              ["1863", "Pameran", "Publik membuka", "Salon des Refusés memberi karya yang ditolak sebuah ruang untuk dilihat."],
+              ["2026", "Web", "Gerbang dilepas", "desRefusés memindahkan semangat itu ke galeri digital tanpa seleksi."],
+            ].map(([year, context, title, text]) => (
+              <div key={`${year}-${context}`} className="group border-t hairline pt-7">
+                <div className="flex items-baseline justify-between">
+                  <span className="font-display text-[38px] leading-none text-wine transition-colors">{year}</span>
+                  <span className="label text-ink/65">{context}</span>
+                </div>
+                <h3 className="font-display mt-6 text-[25px] leading-none">{title}</h3>
+                <p className="mt-3 max-w-xs text-[14px] leading-relaxed text-ink/65">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="prinsip" className="scroll-mt-24 border-y hairline bg-canvas">
+        <div className="mx-auto max-w-[1240px] px-5 py-16 lg:px-10 lg:py-24">
+          <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+            <div className="lg:col-span-5" data-reveal>
+              <div className="label flex items-center gap-4 text-ink/65"><span>Prinsip</span></div>
+              <h2 className="font-display mt-6 text-[41px] leading-[1.12] tracking-[-0.01em] sm:text-[46px]">
+                Empat hal<br />yang kami jaga.
+              </h2>
+              <p className="mt-7 max-w-sm text-[15px] leading-[1.7] text-ink/65">
+                Bukan janji bahwa semua karya akan disukai. Janji bahwa tidak ada karya yang boleh dihalangi hanya karena selera seseorang.
+              </p>
+            </div>
+            <div className="lg:col-span-7" data-reveal data-reveal-delay="1">
+              {[
+                ["01", "Hak untuk dilihat", "Karya tampil di galeri utama tanpa antrean seleksi kurator. Tidak ada dewan juri yang menentukan kelayakan tampil."],
+                ["02", "Publik yang menilai", "Apresiasi tumbuh dari respons komunitas — suka, komentar, simpan, dan perhatian yang nyata. Bukan dari stempel satu meja."],
+                ["03", "Kuasa yang terbatas", "Kurator mengelola challenge miliknya. Admin menjaga etika dan verifikasi. Tidak ada satu peran yang memiliki seluruh galeri."],
+                ["04", "Etika, bukan selera", "Kebebasan ekspresi tetap menghormati batas: tanpa plagiarisme, kebencian, pelecehan, atau konten yang membahayakan."],
+              ].map(([num, title, text], index) => (
+                <details key={num} className="accordion group" open={index === 0}>
+                  <summary>
+                    <div className="flex items-baseline gap-6">
+                      <span className="label w-7 shrink-0 text-wine">{num}</span>
+                      <h3 className="font-display text-[28px] leading-none">{title}</h3>
+                    </div>
+                    <i className="fa-solid fa-plus text-[13px] text-ink/65" />
+                  </summary>
+                  <div className="accordion-body pb-8 pl-0 sm:pl-[3.25rem]">
+                    <p className="max-w-2xl text-[15px] leading-[1.7] text-ink/65">{text}</p>
+                  </div>
+                </details>
               ))}
             </div>
-          </section>
+          </div>
+        </div>
+      </section>
 
-          <section className="space-y-4 border-t border-ink/15 pt-10">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              Ajakan
-            </p>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Sejarah tidak berhenti pada penolakan.
+      <section id="galeri" className="mx-auto max-w-[1240px] scroll-mt-20 px-5 py-16 lg:px-10 lg:py-24">
+        <div className="grid items-end gap-8 lg:grid-cols-12">
+          <div className="lg:col-span-8" data-reveal>
+            <div className="label flex items-center gap-4 text-ink/65"><span>Galeri publik</span></div>
+            <h2 className="font-display mt-5 text-[41px] leading-[1.12] tracking-[-0.01em] sm:text-[54px] lg:text-[62px]">
+              Salon<br />tanpa juri.
             </h2>
-            <p className="max-w-2xl text-sm leading-relaxed text-ink/55">
-              Setiap karya yang diunggah adalah kelanjutan dari semangat 1863:
-              membuka ruang ketika pintu lain menutup.
+          </div>
+          <div className="lg:col-span-4" data-reveal data-reveal-delay="1">
+            <p className="max-w-sm text-[15px] leading-[1.7] text-ink/65">
+              Semua karya tampil langsung setelah diunggah. Tidak ada antrean seleksi, tidak ada penolakan kurator. Hanya karya dan publiknya.
             </p>
-            <div className="flex flex-wrap gap-3 pt-1">
-              <Link
-                href="/register"
-                className="bg-ink px-4 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-brand"
+            <div className="mt-6 flex items-center gap-7">
+              <button type="button" onClick={() => setSort("popular")} className={`chip ${sort === "popular" ? "active" : ""}`}>
+                Paling diapresiasi
+              </button>
+              <button type="button" onClick={() => setSort("newest")} className={`chip ${sort === "newest" ? "active" : ""}`}>
+                Terbaru
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-14 flex flex-col gap-5 border-b hairline pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="relative w-full lg:max-w-sm">
+            <i className="fa-solid fa-magnifying-glass absolute left-0 top-1/2 -translate-y-1/2 text-xs text-ink/65" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Cari judul, kreator, atau tag..."
+              className="field pl-6 text-[15px]"
+            />
+          </div>
+          <div className="-mx-1 flex items-center gap-6 overflow-x-auto px-1 pb-1">
+            <button type="button" onClick={() => setCategoryId("all")} className={`chip ${categoryId === "all" ? "active" : ""}`}>
+              Semua
+            </button>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => setCategoryId(category.id)}
+                className={`chip ${categoryId === category.id ? "active" : ""}`}
               >
-                Daftar sebagai kreator
-              </Link>
-              <Link
-                href="/gallery"
-                className="border border-ink/20 px-4 py-2.5 text-sm font-medium text-ink/70 transition-colors hover:border-ink hover:text-ink"
-              >
-                Jelajahi galeri
+                {category.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <p className="label mt-6 text-ink/65">
+          <span className="font-semibold text-ink/80">{filteredArtworks.length}</span> karya ditemukan
+          {query ? ` untuk “${query}”` : ""}
+        </p>
+
+        {filteredArtworks.length ? (
+          <div className="mt-8 columns-1 gap-8 sm:columns-2 xl:columns-3">
+            {filteredArtworks.map((artwork, index) => (
+              <ArtworkCard
+                key={artwork.id}
+                artwork={artwork}
+                creator={users[artwork.userId]?.name}
+                creatorId={artwork.userId}
+                category={categoryNames[artwork.categoryId]}
+                commentCount={commentCounts[artwork.id] ?? 0}
+                index={index}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-8 border border-dashed border-ink/20 p-10 text-center">
+            <i className="fa-regular fa-folder-open text-2xl text-ink/40" />
+            <h3 className="font-display mt-4 text-[24px]">Belum ada karya yang cocok</h3>
+            <p className="mt-2 text-sm text-ink/60">Coba kata kunci lain atau pilih kategori berbeda.</p>
+            <button type="button" onClick={resetFilters} className="btn btn-outline btn-sm mt-5">Reset filter</button>
+          </div>
+        )}
+      </section>
+
+      <section className="mx-auto max-w-[1240px] px-5 pb-16 lg:px-10 lg:pb-24">
+        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end" data-reveal>
+          <div>
+            <div className="label flex items-center gap-4 text-ink/65"><span>Ruang kurator</span></div>
+            <h2 className="font-display mt-5 text-[38px] leading-[1.12] sm:text-[46px] lg:text-[56px]">
+              Pameran<br />tandingan.
+            </h2>
+          </div>
+          <Link href="/challenges" className="btn btn-outline w-fit">Semua tantangan</Link>
+        </div>
+        {matchingChallenges.length ? (
+          <div className="mt-14 grid gap-x-8 gap-y-14 md:grid-cols-2 lg:grid-cols-3">
+            {matchingChallenges.map((challenge) => {
+              const winner = (db.artworks ?? []).find((artwork) => artwork.id === challenge.winners?.first);
+              return (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  curator={users[challenge.curatorId]?.name}
+                  submissions={submissionCounts[challenge.id] ?? 0}
+                  winnerTitle={winner?.title}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-14 border border-dashed border-ink/20 p-10 text-center">
+            <i className="fa-regular fa-flag text-2xl text-ink/40" />
+            <h3 className="font-display mt-4 text-[24px]">Belum ada tantangan aktif</h3>
+            <p className="mt-2 text-sm text-ink/60">Curator sedang menyiapkan pameran tandingan berikutnya.</p>
+          </div>
+        )}
+      </section>
+
+
+      <section id="manifesto" className="relative scroll-mt-20 overflow-hidden border-y hairline bg-canvas">
+        <div className="pointer-events-none absolute -bottom-20 -right-10 select-none font-display text-[36vw] leading-none text-ink/[0.035]">
+          1863
+        </div>
+        <div className="relative mx-auto max-w-[1240px] scroll-mt-24 px-5 py-16 lg:px-10 lg:py-24">
+          <div className="grid gap-12 lg:grid-cols-12 lg:gap-20">
+            <div className="lg:col-span-4" data-reveal>
+              <p className="font-serif-italic mt-8 text-[32px] leading-[1.12] text-ink sm:text-[41px]">
+                “Karya Anda,<br />hak Anda<br />untuk dilihat.”
+              </p>
+              <Link href="/home#prinsip" className="label mt-9 inline-flex items-center gap-3 text-ink/65 transition-colors hover:text-wine">
+                Baca manifesto
               </Link>
             </div>
-          </section>
+            <div className="lg:col-span-8" data-reveal data-reveal-delay="1">
+              <h2 className="font-display max-w-3xl text-[28px] leading-[1.12] tracking-[-0.01em] text-ink sm:text-[38px]">
+                Juri tidak lagi memegang kunci galeri. Kekuasaan dibagi agar tidak menumpuk.
+              </h2>
+              <div className="mt-14 grid gap-8 sm:grid-cols-3">
+                {[
+                  ["01", "Member & Kreator", "Mengunggah karya tanpa sensor juri. Mengelola portofolio, berinteraksi, dan melaporkan konten yang melanggar."],
+                  ["02", "Curator", "Menyelenggarakan tantangan sukarela setelah disetujui admin. Kuasa terbatas pada ruang acaranya sendiri."],
+                  ["03", "Admin", "Memverifikasi curator, mengelola kategori, dan menindak laporan berdasarkan etika komunitas."],
+                ].map(([num, title, text]) => (
+                  <div key={num} className="group border-t hairline pt-6">
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-display text-[28px] leading-none text-wine">{num}</span>
+                      <span className="label text-ink/65">Peran</span>
+                    </div>
+                    <h3 className="font-display mt-5 text-[26px] leading-none">{title}</h3>
+                    <p className="mt-4 text-[13px] leading-relaxed text-ink/65">{text}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-14 flex flex-col items-start justify-between gap-5 border-t hairline pt-7 sm:flex-row sm:items-center">
+                <span className="label text-ink/65">Tanpa juri seleksi. Tanpa sensor selera.</span>
+                <div className="flex flex-wrap gap-3">
+                  {user?.role === "member" ? (
+                    <Link href="/dashboard/artworks" className="btn btn-ink btn-sm">Unggah karya sekarang</Link>
+                  ) : (
+                    <Link href="/register" className="btn btn-outline btn-sm">Daftar sebagai kreator</Link>
+                  )}
+                  <Link href="/challenges" className="btn btn-outline btn-sm">Lihat tantangan</Link>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/confirm-dialog";
+import Modal from "@/components/modal";
+import { notify } from "@/components/toast";
 import { isoNow, loadDb, saveDb, uid } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 import { useSession } from "@/lib/use-session";
@@ -27,23 +30,24 @@ export default function DashboardArtworksPage() {
   const [confirmingId, setConfirmingId] = useState(null);
 
   useEffect(() => {
+    if (error) notify(error, "error");
+  }, [error]);
+
+  useEffect(() => {
+    if (notice) notify(notice, "success");
+  }, [notice]);
+
+  useEffect(() => {
     const timer = setTimeout(() => setDb(loadDb()), 0);
     return () => clearTimeout(timer);
   }, []);
 
-  const artworks = useMemo(
-    () => db.artworks.filter((item) => item.userId === user?.id),
-    [db, user],
-  );
-
+  const artworks = useMemo(() => db.artworks.filter((item) => item.userId === user?.id), [db, user]);
   const categoryNames = useMemo(
     () => Object.fromEntries(db.categories.map((item) => [item.id, item.name])),
     [db],
   );
-
-  const confirming = confirmingId
-    ? artworks.find((item) => item.id === confirmingId) ?? null
-    : null;
+  const confirming = confirmingId ? artworks.find((item) => item.id === confirmingId) ?? null : null;
 
   function resetForm() {
     setShowForm(false);
@@ -57,7 +61,6 @@ export default function DashboardArtworksPage() {
     setError("");
     setNotice("");
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
       setError("File harus berupa gambar.");
       setFileName("");
@@ -70,15 +73,11 @@ export default function DashboardArtworksPage() {
       setForm((current) => ({ ...current, image: "" }));
       return;
     }
-
     setFileName(file.name);
     setForm((current) => ({ ...current, image: "" }));
     const reader = new FileReader();
     reader.onload = () => {
-      setForm((current) => ({
-        ...current,
-        image: typeof reader.result === "string" ? reader.result : "",
-      }));
+      setForm((current) => ({ ...current, image: typeof reader.result === "string" ? reader.result : "" }));
     };
     reader.onerror = () => setError("Gambar gagal dibaca.");
     reader.readAsDataURL(file);
@@ -89,10 +88,7 @@ export default function DashboardArtworksPage() {
     setNotice("");
     setConfirmingId(null);
     setEditingId(null);
-    setForm({
-      ...emptyForm,
-      categoryId: db.categories[0]?.id ?? "",
-    });
+    setForm({ ...emptyForm, categoryId: db.categories[0]?.id ?? "" });
     setFileName("");
     setShowForm(true);
   }
@@ -117,35 +113,24 @@ export default function DashboardArtworksPage() {
     event.preventDefault();
     setError("");
     setNotice("");
-
     if (!user || user.role !== "member") {
       setError("Hanya Member yang bisa mengelola karya.");
       return;
     }
-
     const title = form.title.trim();
     const description = form.description.trim();
-    const tags = form.tags
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-
+    const tags = form.tags.split(",").map((item) => item.trim()).filter(Boolean);
     if (!title || !description || !form.categoryId || tags.length === 0) {
-      setError(
-        "Judul, deskripsi, kategori, dan minimal satu tag wajib diisi.",
-      );
+      setError("Judul, deskripsi, kategori, dan minimal satu tag wajib diisi.");
       return;
     }
     if (!editingId && !form.image) {
       setError("Pilih file gambar terlebih dahulu.");
       return;
     }
-
     const next = loadDb();
     if (editingId) {
-      const target = next.artworks.find(
-        (item) => item.id === editingId && item.userId === user.id,
-      );
+      const target = next.artworks.find((item) => item.id === editingId && item.userId === user.id);
       if (!target) {
         setError("Karya tidak ditemukan.");
         return;
@@ -170,7 +155,6 @@ export default function DashboardArtworksPage() {
       });
       setNotice("Karya berhasil diunggah.");
     }
-
     saveDb(next);
     setDb(next);
     setConfirmingId(null);
@@ -179,19 +163,11 @@ export default function DashboardArtworksPage() {
 
   function deleteArtwork(id) {
     const next = loadDb();
-    const target = next.artworks.find(
-      (item) => item.id === id && item.userId === user?.id,
-    );
+    const target = next.artworks.find((item) => item.id === id && item.userId === user?.id);
     if (!target) return;
-
-    const removedComments = next.comments
-      .filter((item) => item.artworkId === id)
-      .map((item) => item.id);
-
+    const removedComments = next.comments.filter((item) => item.artworkId === id).map((item) => item.id);
     next.comments = next.comments.filter((item) => item.artworkId !== id);
-    next.submissions = next.submissions.filter(
-      (item) => item.artworkId !== id,
-    );
+    next.submissions = next.submissions.filter((item) => item.artworkId !== id);
     next.reports = next.reports.filter(
       (item) =>
         !(item.type === "artwork" && item.targetId === id) &&
@@ -206,7 +182,6 @@ export default function DashboardArtworksPage() {
       item.favorites = (item.favorites ?? []).filter((fav) => fav !== id);
     });
     next.artworks = next.artworks.filter((item) => item.id !== id);
-
     saveDb(next);
     setDb(next);
     setConfirmingId(null);
@@ -216,243 +191,157 @@ export default function DashboardArtworksPage() {
 
   return (
     <>
-      <header className="space-y-2">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+      <header className="border-b hairline pb-7">
+        <div className="label flex items-center gap-3 text-wine">
+          <span className="h-px w-8 bg-wine" />
           Member
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Karya saya</h1>
-        <p className="text-sm leading-relaxed text-ink/55">
-          Kelola karya yang Anda pajang di galeri publik. Gambar disimpan di
-          browser dengan batas 1 MB per karya.
+        </div>
+        <h1 className="font-display mt-5 text-[38px] leading-none sm:text-[48px]">Karya saya.</h1>
+        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/65">
+          Kelola karya yang Anda pajang di galeri publik. Gambar disimpan di browser dengan batas 1 MB per karya.
         </p>
       </header>
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-ink/50">{artworks.length} karya</p>
-        <button
-          type="button"
-          onClick={startCreate}
-          className="bg-ink px-4 py-2.5 text-xs font-medium text-paper transition-colors hover:bg-brand"
-        >
-          Unggah karya
+        <p className="label text-ink/65">{artworks.length} karya</p>
+        <button type="button" onClick={startCreate} className="btn btn-ink btn-sm">
+          <i className="fa-solid fa-plus" /> Unggah karya
         </button>
       </div>
 
-      {showForm && (
-        <form
-          onSubmit={saveArtwork}
-          className="space-y-4 border border-ink/15 bg-white p-4"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-              {editingId ? "Edit karya" : "Karya baru"}
-            </p>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-            >
-              Batal
-            </button>
-          </div>
-
+      <Modal
+        open={showForm}
+        onClose={resetForm}
+        subtitle={editingId ? "Perbarui karya" : "Karya baru"}
+        title={editingId ? "Edit karya" : "Unggah karya"}
+      >
+        <form onSubmit={saveArtwork} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1 text-xs text-ink/60">
-              Judul karya
+            <label className="block">
+              <span className="label">Judul karya</span>
               <input
                 type="text"
                 value={form.title}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, title: event.target.value }))
-                }
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="Judul karya"
-                className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+                className="field mt-2"
               />
             </label>
-            <label className="space-y-1 text-xs text-ink/60">
-              Kategori
+            <label className="block">
+              <span className="label">Kategori</span>
               <select
                 value={form.categoryId}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    categoryId: event.target.value,
-                  }))
-                }
-                className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none focus:border-ink"
+                onChange={(event) => setForm((current) => ({ ...current, categoryId: event.target.value }))}
+                className="field mt-2"
               >
                 <option value="">Pilih kategori</option>
                 {db.categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
+                  <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
               </select>
             </label>
           </div>
-
-          <label className="block space-y-1 text-xs text-ink/60">
-            Deskripsi
+          <label className="block">
+            <span className="label">Deskripsi</span>
             <textarea
               value={form.description}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
-              }
+              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
               rows={4}
               placeholder="Ceritakan karya Anda"
-              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+              className="field mt-2"
             />
           </label>
-
-          <label className="block space-y-1 text-xs text-ink/60">
-            Tags (dipisah koma, minimal satu)
+          <label className="block">
+            <span className="label">Tags (dipisah koma, minimal satu)</span>
             <input
               type="text"
               value={form.tags}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, tags: event.target.value }))
-              }
+              onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
               placeholder="abstrak, warna, manifesto"
-              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
+              className="field mt-2"
             />
           </label>
-
           {editingId ? (
-            <p className="border border-dashed border-ink/20 p-3 text-xs leading-relaxed text-ink/55">
-              File karya tidak bisa diganti saat edit. Hapus dan unggah ulang
-              karya untuk mengganti gambar.
+            <p className="border border-dashed border-ink/20 p-3 text-[13px] leading-relaxed text-ink/55">
+              File karya tidak bisa diganti saat edit. Hapus dan unggah ulang karya untuk mengganti gambar.
             </p>
           ) : (
-            <label className="block space-y-1 text-xs text-ink/60">
-              File gambar (maksimal 1 MB)
-              <input
-                type="file"
-                accept="image/*"
-                onChange={pickFile}
-                className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none focus:border-ink"
-              />
+            <label className="block">
+              <span className="label">File gambar (maksimal 1 MB)</span>
+              <input type="file" accept="image/*" onChange={pickFile} className="field mt-2" />
             </label>
           )}
-
           {form.image && (
-            <div className="flex items-center gap-3 border border-ink/15 p-3">
-              <img
-                src={form.image}
-                alt="Pratinjau karya"
-                className="h-16 w-16 object-cover"
-              />
-              <p className="text-xs text-ink/55">
-                {fileName || "Gambar karya saat ini"}
-              </p>
+            <div className="flex items-center gap-3 border hairline p-3">
+              <img src={form.image} alt="Pratinjau karya" className="h-16 w-16 object-cover" />
+              <p className="text-[13px] text-ink/55">{fileName || "Gambar karya saat ini"}</p>
             </div>
           )}
-
-          <button
-            type="submit"
-            className="bg-ink px-4 py-2.5 text-xs font-medium text-paper transition-colors hover:bg-brand"
-          >
-            {editingId ? "Simpan perubahan" : "Unggah karya"}
-          </button>
-        </form>
-      )}
-
-      {error && (
-        <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
-        </p>
-      )}
-      {notice && <p className="text-xs text-ink/55">{notice}</p>}
-
-      {confirming && (
-        <div className="border-l-2 border-red-600 bg-red-50 px-3 py-2.5 text-xs text-red-700">
-          <p>
-            Hapus &quot;{confirming.title}&quot;? Komentar, suka, favorit,
-            laporan, dan submisi terkait ikut dihapus.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => deleteArtwork(confirming.id)}
-              className="bg-red-700 px-3 py-1.5 text-xs text-white hover:bg-red-800"
-            >
-              Ya, hapus
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingId(null)}
-              className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-            >
-              Batal
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button type="button" onClick={resetForm} className="btn btn-outline btn-sm">Batal</button>
+            <button type="submit" className="btn btn-ink btn-sm">
+              {editingId ? "Simpan perubahan" : "Unggah karya"}
             </button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
-      <div className="border border-ink/15 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-ink/15 bg-paper text-[10px] uppercase tracking-[0.12em] text-ink/45">
+      {error && <p className="border-l-2 border-wine bg-wine/5 px-3 py-2 text-[13px] text-wine">{error}</p>}
+      {notice && <p className="label text-wine">{notice}</p>}
+
+      <ConfirmDialog
+        open={Boolean(confirming)}
+        onClose={() => setConfirmingId(null)}
+        onConfirm={() => confirming && deleteArtwork(confirming.id)}
+        title="Hapus karya"
+        subtitle="Member"
+        message={
+          confirming
+            ? `Hapus "${confirming.title}"? Komentar, suka, favorit, laporan, dan submisi terkait ikut dihapus.`
+            : ""
+        }
+        danger
+        confirmLabel="Ya, hapus"
+      />
+
+      <div className="border hairline bg-white">
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-medium">Karya</th>
-                <th className="px-4 py-3 font-medium">Kategori</th>
-                <th className="px-4 py-3 font-medium">Suka</th>
-                <th className="px-4 py-3 font-medium">Tanggal</th>
-                <th className="px-4 py-3 text-right font-medium">Aksi</th>
+                <th>Karya</th>
+                <th>Kategori</th>
+                <th>Suka</th>
+                <th>Tanggal</th>
+                <th className="text-right">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {artworks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-ink/45">
-                    Belum ada karya. Unggah karya pertama Anda.
-                  </td>
+                  <td colSpan={5} className="py-8 text-center text-ink/55">Belum ada karya. Unggah karya pertama Anda.</td>
                 </tr>
               ) : (
                 artworks.map((artwork) => (
-                  <tr
-                    key={artwork.id}
-                    className="border-b border-ink/10 last:border-b-0"
-                  >
-                    <td className="px-4 py-3">
+                  <tr key={artwork.id}>
+                    <td>
                       <div className="flex items-center gap-3">
-                        <img
-                          src={artwork.image}
-                          alt=""
-                          className="h-12 w-12 object-cover"
-                        />
+                        <img src={artwork.image} alt="" className="h-12 w-12 object-cover" />
                         <div>
-                          <p className="font-medium">{artwork.title}</p>
-                          <p className="text-xs text-ink/50">
-                            {(artwork.tags ?? []).map((tag) => `#${tag}`).join(" ")}
-                          </p>
-                          <Link
-                            href={`/artwork/${artwork.id}`}
-                            className="text-xs text-ink/45 hover:text-ink hover:underline"
-                          >
+                          <p className="font-semibold">{artwork.title}</p>
+                          <p className="label mt-1 text-ink/50">{(artwork.tags ?? []).map((tag) => `#${tag}`).join(" ")}</p>
+                          <Link href={`/artwork/${artwork.id}`} className="label mt-1 inline-block text-ink/55 hover:text-wine">
                             Lihat di galeri
                           </Link>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-ink/60">
-                      {categoryNames[artwork.categoryId] ?? "Tanpa kategori"}
-                    </td>
-                    <td className="px-4 py-3 text-ink/60">{artwork.likes}</td>
-                    <td className="px-4 py-3 text-ink/60">
-                      {artwork.createdAt?.slice(0, 10) ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="text-ink/65">{categoryNames[artwork.categoryId] ?? "Tanpa kategori"}</td>
+                    <td className="text-ink/65">{artwork.likes}</td>
+                    <td className="text-ink/65">{artwork.createdAt?.slice(0, 10) ?? "—"}</td>
+                    <td>
                       <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(artwork)}
-                          className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-                        >
-                          Edit
-                        </button>
+                        <button type="button" onClick={() => startEdit(artwork)} className="btn btn-outline btn-sm">Edit</button>
                         <button
                           type="button"
                           onClick={() => {
@@ -460,7 +349,7 @@ export default function DashboardArtworksPage() {
                             setNotice("");
                             setConfirmingId(artwork.id);
                           }}
-                          className="border border-red-600/50 px-3 py-1.5 text-xs text-red-700 transition-colors hover:bg-red-50"
+                          className="btn btn-outline btn-sm !border-wine/40 !text-wine"
                         >
                           Hapus
                         </button>

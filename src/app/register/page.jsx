@@ -3,73 +3,71 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import AuthShell from "@/components/auth-shell";
+import { notify } from "@/components/toast";
 import { isoNow, loadDb, saveDb, setSessionId, uid } from "@/lib/local-data";
 import { notifySessionChange } from "@/lib/use-session";
 import { IMAGES } from "@/lib/seed";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [role, setRole] = useState("kreator");
+  const [role, setRole] = useState("member");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   function handleSubmit(event) {
     event.preventDefault();
     setError("");
-    setSuccess("");
 
     const cleanName = name.trim();
-    const cleanUsername = username.trim();
-    const cleanEmail = email.trim();
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanEmail = email.trim().toLowerCase();
+
+    function fail(msg) {
+      setError(msg);
+      notify(msg, "error");
+    }
 
     if (!cleanName || !cleanUsername || !cleanEmail || !password || !confirmPassword) {
-      setError("Semua kolom wajib diisi.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password minimal 6 karakter.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Ulangi password tidak sama.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setError("Format email tidak valid.");
-      return;
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-      setError("Username hanya boleh huruf, angka, dan underscore.");
+      fail("Semua kolom wajib diisi.");
       return;
     }
 
     const db = loadDb();
-    const emailTaken = db.users.some(
-      (item) => item.email.toLowerCase() === cleanEmail.toLowerCase(),
-    );
-    const usernameTaken = db.users.some(
-      (item) => item.username.toLowerCase() === cleanUsername.toLowerCase(),
-    );
-
-    if (emailTaken) {
-      setError("Email sudah digunakan.");
+    if (db.users.some((item) => item.email.toLowerCase() === cleanEmail)) {
+      fail("Email sudah terdaftar. Gunakan email lain.");
       return;
     }
-    if (usernameTaken) {
-      setError("Username sudah digunakan.");
+    if (db.users.some((item) => item.username.toLowerCase() === cleanUsername)) {
+      fail("Username sudah digunakan.");
+      return;
+    }
+    if (!/^[a-z0-9_]{3,20}$/.test(cleanUsername)) {
+      fail("Username hanya boleh huruf kecil, angka, dan underscore (3-20 karakter).");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      fail("Format email tidak valid.");
+      return;
+    }
+    if (password.length < 6) {
+      fail("Password minimal 6 karakter.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      fail("Konfirmasi password tidak sama.");
       return;
     }
 
-    const finalRole = role === "kurator" ? "curator" : "member";
+    const isCurator = role === "curator";
     const newUser = {
       id: uid("u"),
-      role: finalRole,
-      status: finalRole === "curator" ? "pending" : "approved",
+      role: isCurator ? "curator" : "member",
+      status: isCurator ? "pending" : "approved",
       name: cleanName,
       username: cleanUsername,
       email: cleanEmail,
@@ -81,173 +79,130 @@ export default function RegisterPage() {
       following: [],
       joinedAt: isoNow(),
     };
-
     db.users.push(newUser);
     saveDb(db);
-
-    if (finalRole === "member") {
-      setSessionId(newUser.id);
-      notifySessionChange();
-      router.push("/home");
-      return;
-    }
-
-    setSuccess(
-      "Pengajuan kurator berhasil. Masuk untuk melihat status akun; dashboard menunggu persetujuan Admin.",
-    );
-    setName("");
-    setUsername("");
-    setEmail("");
-    setPassword("");
-    setConfirmPassword("");
+    setSessionId(newUser.id);
+    notifySessionChange();
+    router.push(isCurator ? "/pending" : "/home");
   }
 
   return (
-    <main className="px-6 py-16 sm:px-10">
-      <div className="mx-auto max-w-md border border-ink/15 bg-white p-6 sm:p-8">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-brand" />
-          <span className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Daftar akun
-          </span>
-        </div>
-
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-          Buat akun baru.
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-ink/55">
-          Daftar untuk mulai memajang dan mengelola karya Anda.
-        </p>
-
-        <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <span className="text-xs font-medium text-ink/60">Daftar sebagai</span>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRole("kreator")}
-                className={`border px-3 py-2 text-sm transition-colors ${
-                  role === "kreator"
-                    ? "border-ink bg-ink text-paper"
-                    : "border-ink/20 text-ink/60 hover:border-ink/40"
-                }`}
-              >
-                Kreator
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole("kurator")}
-                className={`border px-3 py-2 text-sm transition-colors ${
-                  role === "kurator"
-                    ? "border-ink bg-ink text-paper"
-                    : "border-ink/20 text-ink/60 hover:border-ink/40"
-                }`}
-              >
-                Kurator
-              </button>
-            </div>
+    <AuthShell mode="register">
+      <h1 className="font-display text-[34px] leading-[1.12] tracking-[-0.01em] lg:text-[40px]">
+        Buat<br />akun kreator.
+      </h1>
+      <p className="mt-5 text-[14px] leading-[1.7] text-ink/65">
+        {role === "curator"
+          ? "Daftar sebagai curator untuk membuat tantangan setelah disetujui admin."
+          : "Daftar sebagai member untuk mulai memajang karya."}
+      </p>
+      <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+        <div>
+          <span className="label text-ink/65">Daftar sebagai</span>
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setRole("member")}
+              className={`chip ${role === "member" ? "active" : ""}`}
+            >
+              Member
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole("curator")}
+              className={`chip ${role === "curator" ? "active" : ""}`}
+            >
+              Curator
+            </button>
           </div>
-
-          <label className="block">
-            <span className="text-xs font-medium text-ink/60">Nama</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Nama tampilan"
-              autoComplete="name"
-              className="mt-1.5 w-full border border-ink/20 bg-paper px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-medium text-ink/60">Username</span>
-            <input
-              type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="huruf, angka, underscore"
-              autoComplete="username"
-              className="mt-1.5 w-full border border-ink/20 bg-paper px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-medium text-ink/60">Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="nama@email.com"
-              autoComplete="email"
-              className="mt-1.5 w-full border border-ink/20 bg-paper px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-medium text-ink/60">Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Min. 6 karakter"
-              autoComplete="new-password"
-              className="mt-1.5 w-full border border-ink/20 bg-paper px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-xs font-medium text-ink/60">
-              Ulangi password
-            </span>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              placeholder="Ulangi password"
-              autoComplete="new-password"
-              className="mt-1.5 w-full border border-ink/20 bg-paper px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink"
-            />
-          </label>
-
-          {role === "kurator" && (
-            <p className="border-l-2 border-brand/60 bg-brand/5 px-3 py-2.5 text-xs leading-relaxed text-ink/60">
-              Akun kurator akan berstatus{" "}
-              <span className="font-medium text-ink">pending</span> selama proses
-              pembuatan sampai Admin menyetujui.
-            </p>
-          )}
-
-          {error && (
-            <p className="border-l-2 border-red-600 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {error}
-            </p>
-          )}
-
-          {success && (
-            <p className="border-l-2 border-green-700 bg-green-50 px-3 py-2 text-xs text-green-800">
-              {success}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            className="w-full bg-ink px-4 py-3 text-sm font-medium text-paper transition-colors hover:bg-brand"
-          >
-            Daftar
-          </button>
-        </form>
-
-        <p className="mt-5 text-center text-xs text-ink/50">
+        </div>
+        <div>
+          <label className="label text-ink/65" htmlFor="reg-name">Nama tampilan</label>
+          <input
+            id="reg-name"
+            type="text"
+            required
+            maxLength={60}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Nama atau komunitas"
+            className="field mt-1.5"
+          />
+        </div>
+        <div>
+          <label className="label text-ink/65" htmlFor="reg-username">Username</label>
+          <input
+            id="reg-username"
+            type="text"
+            required
+            pattern="[a-z0-9_]{3,20}"
+            title="3-20 karakter: huruf kecil, angka, atau underscore"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="huruf, angka, _"
+            autoComplete="username"
+            className="field mt-1.5"
+          />
+        </div>
+        <div>
+          <label className="label text-ink/65" htmlFor="reg-email">Email</label>
+          <input
+            id="reg-email"
+            type="email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="nama@email.com"
+            autoComplete="email"
+            className="field mt-1.5"
+          />
+        </div>
+        <div>
+          <label className="label text-ink/65" htmlFor="reg-password">Password</label>
+          <input
+            id="reg-password"
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Min. 6 karakter"
+            autoComplete="new-password"
+            className="field mt-1.5"
+          />
+        </div>
+        <div>
+          <label className="label text-ink/65" htmlFor="reg-confirm">Ulangi password</label>
+          <input
+            id="reg-confirm"
+            type="password"
+            required
+            minLength={6}
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            placeholder="Ulangi password"
+            autoComplete="new-password"
+            className="field mt-1.5"
+          />
+        </div>
+        {role === "curator" && (
+          <p className="border-l-2 border-gold bg-gold/10 px-4 py-3 text-[13px] leading-relaxed text-ink/65">
+            Akun kurator akan berstatus <span className="font-semibold">pending</span> sampai Admin menyetujui.
+          </p>
+        )}
+        {error && (
+          <p className="border-l-2 border-wine bg-wine/5 px-4 py-3 font-label text-[13px] leading-relaxed text-wine">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="btn btn-ink w-full">Daftar</button>
+      </form>
+      <div className="mt-8 border-t hairline pt-5">
+        <p className="text-[13px] leading-relaxed text-ink/65">
           Sudah punya akun?{" "}
-          <Link
-            href="/login"
-            className="text-ink underline underline-offset-4 hover:text-brand"
-          >
-            Masuk
-          </Link>
+          <Link href="/login" className="text-wine transition-colors hover:text-ink">Masuk di sini</Link>.
         </p>
       </div>
-    </main>
+    </AuthShell>
   );
 }

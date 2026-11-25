@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/confirm-dialog";
 import { getSessionId, loadDb, saveDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
@@ -9,6 +10,12 @@ const statusLabels = {
   active: "Aktif",
   upcoming: "Mendatang",
   ended: "Selesai",
+};
+
+const statusClasses = {
+  active: "status-live",
+  upcoming: "status-upcoming",
+  ended: "status-ended",
 };
 
 const winnerRanks = [
@@ -103,76 +110,58 @@ export default function DashboardSubmissionsPage() {
 
   return (
     <>
-      <header className="space-y-2">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
+      <header className="border-b hairline pb-7">
+        <div className="label flex items-center gap-3 text-wine">
+          <span className="h-px w-8 bg-wine" />
           Member
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Submisi</h1>
-        <p className="text-sm leading-relaxed text-ink/55">
+        </div>
+        <h1 className="font-display mt-5 text-[38px] leading-none sm:text-[48px]">Submisi.</h1>
+        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink/65">
           Riwayat partisipasi Anda dalam tantangan.
         </p>
       </header>
 
       {notice && (
-        <div className="flex items-start justify-between gap-4 border border-ink/20 bg-paper px-4 py-3 text-sm text-ink/70">
-          <span>{notice}</span>
-          <button
-            type="button"
-            onClick={() => setNotice("")}
-            className="text-[10px] uppercase tracking-[0.12em] text-ink/45 hover:text-ink"
-          >
+        <div className="flex items-start justify-between gap-4 border-l-2 border-wine bg-wine/5 px-4 py-3">
+          <p className="text-[13px] text-wine">{notice}</p>
+          <button type="button" onClick={() => setNotice("")} className="btn btn-ghost btn-sm text-wine">
             Tutup
           </button>
         </div>
       )}
 
-      {confirming && (
-        <div className="flex flex-col gap-3 border border-ink/20 bg-paper px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-ink/70">
-            Tarik submisi <span className="font-medium">{confirming.challenge?.title ?? "ini"}</span>?
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmingId(null)}
-              className="border border-ink/20 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-ink/60 hover:border-ink"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              onClick={() => withdraw(confirming.submission.id)}
-              className="bg-ink px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-paper hover:bg-ink/85"
-            >
-              Ya, tarik
-            </button>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={Boolean(confirming)}
+        onClose={() => setConfirmingId(null)}
+        onConfirm={() => confirming && withdraw(confirming.submission.id)}
+        title="Tarik submisi"
+        subtitle="Member"
+        message={confirming ? `Tarik submisi "${confirming.challenge?.title ?? "ini"}"? Submisi ini akan dihapus dari riwayat Anda.` : ""}
+        danger
+        confirmLabel="Ya, tarik"
+      />
 
       {!user ? (
-        <div className="border border-ink/15 bg-white p-8 text-center text-sm text-ink/55">
+        <div className="border hairline bg-white p-8 text-center text-sm text-ink/55">
           Masuk untuk melihat submisi Anda.{" "}
-          <Link href="/login" className="underline">
-            Masuk
-          </Link>
+          <Link href="/login" className="font-semibold text-wine underline">Masuk</Link>
         </div>
       ) : submissions.length === 0 ? (
-        <div className="border border-ink/15 bg-white p-8 text-center text-sm text-ink/45">
+        <div className="border border-dashed border-ink/20 p-8 text-center text-sm text-ink/55">
           Belum ada submisi tantangan.
         </div>
       ) : (
-        <div className="border border-ink/15 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-ink/15 bg-paper text-[10px] uppercase tracking-[0.12em] text-ink/45">
+        <div className="border hairline bg-white">
+          <div className="table-wrap">
+            <table className="data">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-medium">Tantangan</th>
-                  <th className="px-4 py-3 font-medium">Karya</th>
-                  <th className="px-4 py-3 font-medium">Status challenge</th>
-                  <th className="px-4 py-3 font-medium">Status menang</th>
-                  <th className="px-4 py-3 font-medium">Tanggal</th>
-                  <th className="px-4 py-3 font-medium">Aksi</th>
+                  <th>Tantangan</th>
+                  <th>Karya</th>
+                  <th>Status challenge</th>
+                  <th>Status menang</th>
+                  <th>Tanggal</th>
+                  <th className="text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,61 +169,50 @@ export default function DashboardSubmissionsPage() {
                   const canWithdraw = !item.challenge || item.status !== "ended";
 
                   return (
-                    <tr
-                      key={item.submission.id}
-                      className="border-b border-ink/10 last:border-b-0"
-                    >
-                      <td className="px-4 py-3">
+                    <tr key={item.submission.id}>
+                      <td>
                         {item.challenge ? (
-                          <Link
-                            href={`/challenges/${item.challenge.id}`}
-                            className="font-medium hover:underline"
-                          >
+                          <Link href={`/challenges/${item.challenge.id}`} className="font-semibold hover:text-wine">
                             {item.challenge.title}
                           </Link>
                         ) : (
-                          <span className="text-ink/45">Challenge dihapus</span>
+                          <span className="text-ink/55">Challenge dihapus</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         {item.artwork ? (
-                          <Link
-                            href={`/artwork/${item.artwork.id}`}
-                            className="hover:underline"
-                          >
+                          <Link href={`/artwork/${item.artwork.id}`} className="hover:text-wine">
                             {item.artwork.title}
                           </Link>
                         ) : (
-                          <span className="text-ink/45">Karya dihapus</span>
+                          <span className="text-ink/55">Karya dihapus</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         {item.status ? (
-                          <span className="border border-ink/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-ink/60">
+                          <span className={`status ${statusClasses[item.status]}`}>
                             {statusLabels[item.status]}
                           </span>
                         ) : (
                           <span className="text-ink/45">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td>
                         {item.winnerLabel ? (
-                          <span className="border border-ink px-2 py-1 text-[10px] uppercase tracking-[0.12em]">
-                            {item.winnerLabel}
-                          </span>
+                          <span className="status status-approved">{item.winnerLabel}</span>
                         ) : (
                           <span className="text-ink/45">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-ink/50">
+                      <td className="text-ink/60">
                         {String(item.submission.createdAt ?? "").slice(0, 10) || "—"}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="text-right">
                         {canWithdraw ? (
                           <button
                             type="button"
                             onClick={() => setConfirmingId(item.submission.id)}
-                            className="text-[10px] uppercase tracking-[0.12em] text-ink/55 hover:text-ink hover:underline"
+                            className="btn btn-ghost btn-sm text-wine"
                           >
                             Withdraw
                           </button>

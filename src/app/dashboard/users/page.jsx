@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/confirm-dialog";
+import { notify } from "@/components/toast";
 import { loadDb, saveDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 import { useSession } from "@/lib/use-session";
 
-const filters = ["Semua", "Admin", "Member", "Kurator"];
-const filterRoles = { Admin: "admin", Member: "member", Kurator: "curator" };
+const filters = ["Semua", "Admin", "Member", "Curator"];
+const filterRoles = { Admin: "admin", Member: "member", Curator: "curator" };
+
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export default function DashboardUsersPage() {
   const { user } = useSession();
@@ -21,8 +30,8 @@ export default function DashboardUsersPage() {
 
   const users = useMemo(() => {
     const role = filterRoles[activeFilter];
-    if (!role) return db.users;
-    return db.users.filter((item) => item.role === role);
+    const list = role ? db.users.filter((item) => item.role === role) : db.users;
+    return [...list].sort((a, b) => new Date(b.joinedAt || 0) - new Date(a.joinedAt || 0));
   }, [db, activeFilter]);
 
   const confirming = confirmingId
@@ -92,120 +101,116 @@ export default function DashboardUsersPage() {
     saveDb(next);
     setDb(next);
     setConfirmingId(null);
+    notify("Akun pengguna berhasil dihapus.", "success");
   }
 
   return (
     <>
-      <header className="space-y-2">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-          Admin
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Pengguna</h1>
-        <p className="text-sm leading-relaxed text-ink/55">
-          Lihat dan kelola akun pengguna platform. Akun Admin tidak dapat
-          dihapus.
+      <header className="border-b hairline pb-5">
+        <p className="label text-wine">Panel admin</p>
+        <h1 className="font-display mt-2 text-3xl lg:text-4xl">Pengguna</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink/65">
+          Lihat dan kelola akun pengguna platform. Akun Admin tidak dapat dihapus.
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        {filters.map((item) => (
-          <button
-            type="button"
-            key={item}
-            onClick={() => setActiveFilter(item)}
-            className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition-colors ${
-              item === activeFilter
-                ? "border-ink bg-ink text-paper"
-                : "border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-
-      {confirming && (
-        <div className="border-l-2 border-red-600 bg-red-50 px-3 py-2.5 text-xs text-red-700">
-          <p>
-            Hapus akun {confirming.name}? Karya, komentar, laporan, dan submisi
-            terkait ikut dihapus.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => deleteUser(confirming.id)}
-              className="bg-red-700 px-3 py-1.5 text-xs text-white hover:bg-red-800"
-            >
-              Ya, hapus
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingId(null)}
-              className="border border-ink/20 px-3 py-1.5 text-xs text-ink/60 hover:border-ink"
-            >
-              Batal
-            </button>
+      <div className="border hairline bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b hairline px-5 py-4">
+          <div>
+            <p className="label text-ink/65">Manajemen pengguna</p>
+            <p className="mt-1 text-[13px] text-ink/65">{users.length} pengguna</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-5">
+            {filters.map((item) => (
+              <button
+                type="button"
+                key={item}
+                onClick={() => setActiveFilter(item)}
+                className={`chip ${item === activeFilter ? "active" : ""}`}
+              >
+                {item}
+              </button>
+            ))}
           </div>
         </div>
-      )}
 
-      <div className="border border-ink/15 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-ink/15 bg-paper text-[10px] uppercase tracking-[0.12em] text-ink/45">
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-medium">Pengguna</th>
-                <th className="px-4 py-3 font-medium">Peran</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 text-right font-medium">Aksi</th>
+                <th>Pengguna</th>
+                <th>Peran</th>
+                <th>Status</th>
+                <th>Email</th>
+                <th>Bergabung</th>
+                <th className="text-right">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-ink/45">
+                  <td colSpan={6} className="px-4 py-10 text-center text-[14px] text-ink/55">
                     Tidak ada pengguna pada filter ini.
                   </td>
                 </tr>
               ) : (
                 users.map((item) => (
-                  <tr key={item.id} className="border-b border-ink/10 last:border-b-0">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-xs text-ink/50">@{item.username}</p>
+                  <tr key={item.id}>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        {item.avatar ? (
+                          <img src={item.avatar} alt="" className="avatar h-8 w-8 shrink-0" />
+                        ) : (
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink/10 font-display text-xs">
+                            {(item.name ?? "U").charAt(0)}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium leading-tight">
+                            {item.name}
+                            {item.id === user?.id && (
+                              <span className="ml-1.5 text-[11px] font-label text-wine">(Anda)</span>
+                            )}
+                          </p>
+                          <p className="mt-0.5 text-[12px] text-ink/55">@{item.username}</p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-ink/60">
-                      {item.role === "admin"
-                        ? "Admin"
-                        : item.role === "curator"
-                          ? "Kurator"
-                          : "Member"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`border px-2 py-1 text-[10px] uppercase tracking-[0.12em] ${
-                          item.status === "rejected"
-                            ? "border-red-600/40 text-red-700"
-                            : item.status === "pending"
-                              ? "border-brand/50 text-ink/70"
-                              : "border-ink/25 text-ink/70"
-                        }`}
-                      >
-                        {item.status}
+                    <td>
+                      <span className="tag">
+                        {item.role === "admin"
+                          ? "Admin"
+                          : item.role === "curator"
+                            ? "Curator"
+                            : "Member"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-ink/60">{item.email}</td>
-                    <td className="px-4 py-3 text-right">
-                      {item.role === "admin" ? (
-                        <span className="text-xs text-ink/35">—</span>
+                    <td>
+                      <span
+                        className={`status ${
+                          item.status === "rejected"
+                            ? "status-rejected"
+                            : item.status === "pending"
+                              ? "status-pending"
+                              : "status-approved"
+                        }`}
+                      >
+                        {item.status === "approved" ? "Aktif" : item.status}
+                      </span>
+                    </td>
+                    <td className="text-ink/70">{item.email}</td>
+                    <td className="text-ink/65">{formatDate(item.joinedAt)}</td>
+                    <td className="text-right">
+                      {item.role === "admin" || item.id === user?.id ? (
+                        <span className="label text-ink/40">Dilindungi</span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => setConfirmingId(item.id)}
-                          className="border border-red-600/50 px-3 py-1.5 text-xs text-red-700 transition-colors hover:bg-red-50"
+                          aria-label={`Hapus ${item.name}`}
+                          className="btn btn-outline btn-sm text-wine hover:border-wine"
                         >
-                          Hapus
+                          <i className="fa-solid fa-trash text-[11px]" />
                         </button>
                       )}
                     </td>
@@ -215,7 +220,26 @@ export default function DashboardUsersPage() {
             </tbody>
           </table>
         </div>
+
+        <div className="border-t hairline px-5 py-3 text-[12px] text-ink/55">
+          Menghapus pengguna akan membersihkan karya, komentar, laporan, dan submisi terkait secara otomatis.
+        </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(confirming)}
+        onClose={() => setConfirmingId(null)}
+        onConfirm={() => deleteUser(confirmingId)}
+        title="Hapus pengguna"
+        subtitle="Panel admin"
+        message={
+          <>
+            Hapus akun <span className="font-semibold">{confirming?.name}</span>? Karya, komentar, laporan, dan submisi terkait ikut dihapus.
+          </>
+        }
+        confirmLabel="Ya, hapus"
+        danger
+      />
     </>
   );
 }

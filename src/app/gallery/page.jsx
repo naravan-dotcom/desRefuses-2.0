@@ -1,46 +1,31 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import ArtworkCard from "@/components/artwork-card";
 import { loadDb } from "@/lib/local-data";
 import { createSeedDb } from "@/lib/seed";
 
 export default function GalleryPage() {
   const [db, setDb] = useState(() => createSeedDb());
   const [query, setQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("Semua");
+  const [categoryId, setCategoryId] = useState("all");
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDb(loadDb());
-    }, 0);
+    const timer = setTimeout(() => setDb(loadDb()), 0);
     return () => clearTimeout(timer);
   }, []);
 
-  const categories = useMemo(
-    () => ["Semua", ...db.categories.map((category) => category.name)],
-    [db],
-  );
-
-  const categoryIds = useMemo(
-    () => Object.fromEntries(db.categories.map((category) => [category.name, category.id])),
-    [db],
-  );
-
-  const activeName = categories.includes(activeCategory) ? activeCategory : "Semua";
-
+  const categories = useMemo(() => db.categories ?? [], [db]);
   const creators = useMemo(
-    () => Object.fromEntries(db.users.map((user) => [user.id, user.name])),
+    () => Object.fromEntries((db.users ?? []).map((user) => [user.id, user.name])),
     [db],
   );
-
   const categoryNames = useMemo(
-    () => Object.fromEntries(db.categories.map((category) => [category.id, category.name])),
-    [db],
+    () => Object.fromEntries(categories.map((category) => [category.id, category.name])),
+    [categories],
   );
-
   const commentCounts = useMemo(() => {
-    return db.comments.reduce((counts, comment) => {
+    return (db.comments ?? []).reduce((counts, comment) => {
       counts[comment.artworkId] = (counts[comment.artworkId] ?? 0) + 1;
       return counts;
     }, {});
@@ -48,113 +33,96 @@ export default function GalleryPage() {
 
   const artworks = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return db.artworks.filter((artwork) => {
-      const matchCategory =
-        activeName === "Semua" ||
-        artwork.categoryId === categoryIds[activeName];
-      if (!matchCategory) return false;
+    return (db.artworks ?? []).filter((artwork) => {
+      if (categoryId !== "all" && artwork.categoryId !== categoryId) return false;
       if (!needle) return true;
-
       const creator = creators[artwork.userId] ?? "";
-      return [artwork.title, creator, ...artwork.tags].some((value) =>
-        String(value).toLowerCase().includes(needle),
-      );
+      return [artwork.title, creator, ...(artwork.tags ?? [])]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle));
     });
-  }, [db, query, activeName, creators, categoryIds]);
+  }, [db, query, categoryId, creators]);
 
   return (
-    <main className="px-6 py-16 sm:px-10">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <section className="space-y-3">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-            Galeri publik
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Karya tanpa seleksi juri.
+    <main className="page-enter">
+      <section className="border-b hairline">
+        <div className="mx-auto max-w-[1240px] px-5 py-14 lg:px-10 lg:py-20">
+          <div className="label flex items-center gap-4 text-ink/65"><span>Galeri publik</span></div>
+          <h1 className="font-display mt-6 text-[44px] leading-[1.06] sm:text-[59px] lg:text-[68px]">
+            Karya tanpa<br />seleksi juri.
           </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-ink/55">
-            Jelajahi karya yang dipajang langsung oleh para kreator. Tidak ada
-            kurasi untuk tampil — apresiasi datang dari publik.
+          <p className="mt-6 max-w-2xl text-[15px] leading-[1.7] text-ink/65">
+            Jelajahi karya yang dipajang langsung oleh para kreator. Tidak ada kurasi untuk tampil — apresiasi datang dari publik.
           </p>
-        </section>
+        </div>
+      </section>
 
-        <section className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="mx-auto max-w-[1240px] px-5 py-12 lg:px-10 lg:py-16">
+        <div className="flex flex-col gap-5 border-b hairline pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="relative w-full lg:max-w-sm">
+            <i className="fa-solid fa-magnifying-glass absolute left-0 top-1/2 -translate-y-1/2 text-xs text-ink/65" />
             <input
-              type="text"
+              type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari karya atau kreator"
-              className="w-full border border-ink/20 bg-white px-3 py-2.5 text-sm outline-none placeholder:text-ink/30 focus:border-ink sm:max-w-xs"
+              placeholder="Cari judul, kreator, atau tag..."
+              className="field pl-6 text-[15px]"
             />
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <button
-                  type="button"
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`border px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                    category === activeName
-                      ? "border-ink bg-ink text-paper"
-                      : "border-ink/20 text-ink/60 hover:border-ink hover:text-ink"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {artworks.map((artwork) => (
-              <article
-                key={artwork.id}
-                className="group border border-ink/15 bg-white transition-colors hover:border-ink/40"
+          <div className="-mx-1 flex items-center gap-6 overflow-x-auto px-1 pb-1">
+            <button type="button" onClick={() => setCategoryId("all")} className={`chip ${categoryId === "all" ? "active" : ""}`}>
+              Semua
+            </button>
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => setCategoryId(category.id)}
+                className={`chip ${categoryId === category.id ? "active" : ""}`}
               >
-                <Link href={`/artwork/${artwork.id}`} className="block">
-                  <div className="aspect-[4/5] overflow-hidden bg-ink/5">
-                    <img
-                      src={artwork.image}
-                      alt={`Karya ${artwork.title} oleh ${creators[artwork.userId] ?? "kreator"}`}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                    />
-                  </div>
-                  <div className="p-3 pb-2">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-ink/45">
-                      {categoryNames[artwork.categoryId]}
-                    </p>
-                    <h3 className="mt-1 text-sm font-medium leading-snug">
-                      {artwork.title}
-                    </h3>
-                  </div>
-                </Link>
-                <div className="px-3 pb-3">
-                  {creators[artwork.userId] ? (
-                    <Link
-                      href={`/creator/${artwork.userId}`}
-                      className="text-xs text-ink/55 hover:text-ink hover:underline"
-                    >
-                      {creators[artwork.userId]}
-                    </Link>
-                  ) : (
-                    <p className="text-xs text-ink/55">Kreator</p>
-                  )}
-                  <div className="mt-3 flex items-center gap-3 border-t border-ink/10 pt-2 text-[10px] uppercase tracking-[0.12em] text-ink/45">
-                    <span>{artwork.likes} suka</span>
-                    <span>{commentCounts[artwork.id] ?? 0} komentar</span>
-                  </div>
-                </div>
-              </article>
+                {category.name}
+              </button>
             ))}
-            {artworks.length === 0 && (
-              <p className="col-span-full border border-dashed border-ink/20 p-8 text-center text-sm text-ink/45">
-                Tidak ada karya yang cocok.
-              </p>
-            )}
           </div>
-        </section>
-      </div>
+        </div>
+
+        <p className="label mt-6 text-ink/65">
+          <span className="font-semibold text-ink/80">{artworks.length}</span> karya ditemukan
+          {query ? ` untuk “${query}”` : ""}
+        </p>
+
+        {artworks.length ? (
+          <div className="mt-8 columns-1 gap-8 sm:columns-2 xl:columns-3">
+            {artworks.map((artwork, index) => (
+              <ArtworkCard
+                key={artwork.id}
+                artwork={artwork}
+                creator={creators[artwork.userId]}
+                creatorId={artwork.userId}
+                category={categoryNames[artwork.categoryId]}
+                commentCount={commentCounts[artwork.id] ?? 0}
+                index={index}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-8 border border-dashed border-ink/20 p-10 text-center">
+            <i className="fa-regular fa-folder-open text-2xl text-ink/40" />
+            <h2 className="font-display mt-4 text-[24px]">Belum ada karya yang cocok</h2>
+            <p className="mt-2 text-sm text-ink/60">Coba kata kunci lain atau pilih kategori berbeda.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setCategoryId("all");
+              }}
+              className="btn btn-outline btn-sm mt-5"
+            >
+              Reset filter
+            </button>
+          </div>
+        )}
+      </section>
     </main>
   );
 }
