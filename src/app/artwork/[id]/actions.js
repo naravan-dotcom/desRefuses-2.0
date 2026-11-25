@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import pool from "@/lib/db";
 import { toComment } from "@/lib/db-shape";
-import { REPORT_REASONS } from "@/lib/seed";
+import { REPORT_REASONS } from "@/lib/report-reasons";
 
 function value(formData, key) {
   return String(formData.get(key) ?? "").trim();

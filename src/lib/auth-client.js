@@ -9,7 +9,3 @@ export function setCurrentUser(user) {
 export function getCurrentUser() {
   return currentUser;
 }
-
-export function getSessionId() {
-  return currentUser?.id ?? null;
-}

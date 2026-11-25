@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import NotFoundState from "@/components/ui/not-found-state";
 import pool from "@/lib/db";
 import { toArtwork, toCategory, toUser } from "@/lib/db-shape";
@@ -18,10 +19,22 @@ export default async function CreatorPage({ params }) {
     );
   }
 
-  const [userResult, artworksResult, categoriesResult] = await Promise.all([
+  const session = await auth();
+  const memberId = Number(session?.user?.dbId);
+  const canFollow =
+    session?.user?.role === "member" &&
+    session?.user?.status === "approved" &&
+    Number.isInteger(memberId) &&
+    memberId > 0 &&
+    memberId !== numericId;
+
+  const [userResult, artworksResult, categoriesResult, followResult] = await Promise.all([
     pool.query("SELECT * FROM users WHERE id = $1", [numericId]),
     pool.query("SELECT * FROM artworks WHERE user_id = $1 ORDER BY created_at DESC", [numericId]),
     pool.query("SELECT id, name, slug FROM categories"),
+    canFollow
+      ? pool.query("SELECT 1 FROM follows WHERE member_id = $1 AND target_id = $2", [memberId, numericId])
+      : Promise.resolve({ rowCount: 0 }),
   ]);
 
   if (!userResult.rows.length) {
@@ -40,5 +53,12 @@ export default async function CreatorPage({ params }) {
   const artworks = artworksResult.rows.map(toArtwork);
   const categoryNames = Object.fromEntries(categoriesResult.rows.map((row) => [String(row.id), toCategory(row).name]));
 
-  return <CreatorClient creator={creator} artworks={artworks} categoryNames={categoryNames} />;
+  return (
+    <CreatorClient
+      creator={creator}
+      artworks={artworks}
+      categoryNames={categoryNames}
+      initialFollowing={Boolean(followResult.rowCount)}
+    />
+  );
 }

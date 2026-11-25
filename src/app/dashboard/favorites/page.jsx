@@ -8,9 +8,14 @@ import Modal from "@/components/ui/modal";
 import ModalActions from "@/components/ui/modal-actions";
 import { notify } from "@/components/ui/toast";
 import useErrorNotify from "@/hooks/use-error-notify";
-import { loadDb, saveDb, uid } from "@/lib/local-data";
 import { useSession } from "@/lib/use-session";
-import { listFavorites } from "./actions";
+import {
+  addToCollection as addCollectionItem,
+  createCollection,
+  deleteCollection as deleteCollectionAction,
+  listFavorites,
+  removeFromCollection as removeCollectionItem,
+} from "./actions";
 
 function artCode(id) {
   const digits = String(id ?? "").replace(/\D/g, "");
@@ -47,88 +52,96 @@ export default function DashboardFavoritesPage() {
       return;
     }
     setFavoriteArtworks(result.artworks);
+    setCollections(result.collections ?? []);
     setCreators(result.creators);
     setError("");
     setLoading(false);
   }
 
   useEffect(() => {
-    void Promise.resolve().then(() => {
-      refreshFavorites();
-      const db = loadDb();
-      setCollections(db.collections ?? []);
-    });
+    void Promise.resolve().then(refreshFavorites);
   }, []);
 
   useErrorNotify(error);
 
-  function persistCollections(next) {
-    const db = loadDb();
-    const updated = { ...db, collections: next };
-    if (saveDb(updated)) {
-      setCollections(next);
-      return true;
-    }
-    notify("Gagal menyimpan koleksi di perangkat.", "error");
-    return false;
-  }
-
-  function addCollection(event) {
+  async function addCollection(event) {
     event.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    const next = [
-      ...collections,
-      { id: uid("col"), name, description: "", artworkIds: [], createdAt: new Date().toISOString() },
-    ];
-    if (persistCollections(next)) {
-      setNewName("");
-      setShowNew(false);
-      notify("Koleksi berhasil dibuat.", "success");
+    const formData = new FormData();
+    formData.set("name", name);
+    const result = await createCollection(formData);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    setCollections((current) => [...current, result.collection]);
+    setNewName("");
+    setShowNew(false);
+    notify("Koleksi berhasil dibuat.", "success");
   }
 
-  function addToCollection(collectionId) {
+  async function addToCollection(collectionId) {
     const artwork = showAddTo;
     if (!artwork) return;
-    const next = collections.map((collection) => {
-      if (collection.id !== collectionId || collectionHas(collection, artwork)) return collection;
-      return { ...collection, artworkIds: [...(collection.artworkIds ?? []), `a${artwork.id}`] };
-    });
-    if (persistCollections(next)) {
-      setShowAddTo(null);
-      notify("Karya ditambahkan ke koleksi.", "success");
+    const formData = new FormData();
+    formData.set("collectionId", collectionId);
+    formData.set("artworkId", artwork.id);
+    const result = await addCollectionItem(formData);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    setCollections((current) =>
+      current.map((collection) =>
+        collection.id === String(collectionId)
+          ? { ...collection, artworkIds: [...(collection.artworkIds ?? []), String(artwork.id)] }
+          : collection,
+      ),
+    );
+    setShowAddTo(null);
+    notify("Karya ditambahkan ke koleksi.", "success");
   }
 
-  function removeFromCollection() {
+  async function removeFromCollection() {
     const artwork = showRemove;
     if (!artwork) return;
-    const next = collections.map((collection) => {
-      if (collection.id !== selectedCollection) return collection;
-      return {
-        ...collection,
-        artworkIds: (collection.artworkIds ?? []).filter((value) => {
-          const raw = String(value);
-          return raw !== String(artwork.id) && raw !== `a${artwork.id}` && raw.replace(/\D/g, "") !== String(artwork.id);
-        }),
-      };
-    });
-    if (persistCollections(next)) {
-      setShowRemove(null);
-      notify("Karya dikeluarkan dari koleksi.", "success");
+    const formData = new FormData();
+    formData.set("collectionId", selectedCollection);
+    formData.set("artworkId", artwork.id);
+    const result = await removeCollectionItem(formData);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    setCollections((current) =>
+      current.map((collection) =>
+        collection.id === selectedCollection
+          ? {
+              ...collection,
+              artworkIds: (collection.artworkIds ?? []).filter((id) => String(id) !== String(artwork.id)),
+            }
+          : collection,
+      ),
+    );
+    setShowRemove(null);
+    notify("Karya dikeluarkan dari koleksi.", "success");
   }
 
-  function deleteCollection() {
+  async function deleteCollection() {
     const id = deletingCollection;
     if (!id) return;
-    const next = collections.filter((collection) => collection.id !== id);
-    if (persistCollections(next)) {
-      if (selectedCollection === id) setSelectedCollection("all");
-      setDeletingCollection(null);
-      notify("Koleksi berhasil dihapus.", "success");
+    const formData = new FormData();
+    formData.set("collectionId", id);
+    const result = await deleteCollectionAction(formData);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    setCollections((current) => current.filter((collection) => collection.id !== id));
+    if (selectedCollection === id) setSelectedCollection("all");
+    setDeletingCollection(null);
+    notify("Koleksi berhasil dihapus.", "success");
   }
 
   const activeCollection = collections.find((collection) => collection.id === selectedCollection);
@@ -255,7 +268,7 @@ export default function DashboardFavoritesPage() {
             required
           />
           <p className="mt-2 text-[12px] leading-relaxed text-ink/55">
-            Koleksi disimpan di perangkat ini. Favorit karya tetap tersimpan di akun Anda.
+            Koleksi tersimpan di akun Anda bersama favorit karya.
           </p>
           <ModalActions>
             <button type="button" onClick={() => setShowNew(false)} className="btn btn-outline btn-sm">Batal</button>
@@ -316,7 +329,7 @@ export default function DashboardFavoritesPage() {
         onConfirm={deleteCollection}
         title="Hapus koleksi"
         subtitle="Panel kreator"
-        message="Koleksi akan dihapus dari perangkat. Favorit karya tidak terhapus."
+        message="Koleksi akan dihapus dari akun. Favorit karya tidak terhapus."
         confirmLabel="Ya, hapus"
         danger
       />

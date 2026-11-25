@@ -1,30 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import ArtworkCard from "@/components/artwork/artwork-card";
 import StatusBadge from "@/components/ui/status-badge";
-import { getSessionId } from "@/lib/auth-client";
-import { loadDb, saveDb } from "@/lib/local-data";
 import { useSession } from "@/lib/use-session";
+import { toggleCreatorFollow } from "./actions";
 
 function externalHref(value) {
   return /^https?:\/\//i.test(value) ? value : null;
 }
 
-export default function CreatorClient({ creator, artworks, categoryNames }) {
+export default function CreatorClient({ creator, artworks, categoryNames, initialFollowing }) {
   const { user } = useSession();
   const [notice, setNotice] = useState("");
-  const [version, setVersion] = useState(0);
-
-  const localUser = useMemo(() => {
-    const id = getSessionId();
-    if (!id) return null;
-    return loadDb().users.find((item) => item.id === id) ?? null;
-  }, [version]);
+  const [isFollowing, setIsFollowing] = useState(Boolean(initialFollowing));
+  const [pending, setPending] = useState(false);
 
   const isSelf = Boolean(user && String(user.dbId ?? user.id.replace(/^u/, "")) === creator.id);
-  const isFollowing = Boolean(localUser && !isSelf && (localUser.following ?? []).includes(`u${creator.id}`));
 
   const links = [
     { label: "Instagram", value: creator.links?.instagram ?? "" },
@@ -34,7 +27,8 @@ export default function CreatorClient({ creator, artworks, categoryNames }) {
 
   const roleLabel = creator.role === "admin" ? "Admin" : creator.role === "curator" ? "Kurator" : "Member";
 
-  function toggleFollow() {
+  async function toggleFollow() {
+    if (pending) return;
     if (!user) {
       setNotice("Masuk sebagai Member untuk mengikuti kreator.");
       return;
@@ -47,21 +41,18 @@ export default function CreatorClient({ creator, artworks, categoryNames }) {
       setNotice("Anda tidak dapat mengikuti diri sendiri.");
       return;
     }
-    const next = loadDb();
-    const target = next.users.find((item) => item.id === user.id);
-    if (!target) return;
-    target.following = target.following ?? [];
-    const legacyId = `u${creator.id}`;
-    const index = target.following.indexOf(legacyId);
-    if (index >= 0) {
-      target.following.splice(index, 1);
-      setNotice(`Mengikuti ${creator.name} dihentikan.`);
-    } else {
-      target.following.push(legacyId);
-      setNotice(`${creator.name} kini diikuti.`);
+
+    setPending(true);
+    const formData = new FormData();
+    formData.set("targetId", creator.id);
+    const result = await toggleCreatorFollow(formData);
+    setPending(false);
+    if (!result.ok) {
+      setNotice(result.error);
+      return;
     }
-    saveDb(next);
-    setVersion((current) => current + 1);
+    setIsFollowing(result.following);
+    setNotice(result.following ? `${creator.name} kini diikuti.` : `Mengikuti ${creator.name} dihentikan.`);
   }
 
   return (
@@ -89,7 +80,7 @@ export default function CreatorClient({ creator, artworks, categoryNames }) {
               )}
               {creator.bio && <p className="mt-6 max-w-2xl text-[15px] leading-[1.8] text-ink/70">{creator.bio}</p>}
               {user && !isSelf && user.role === "member" && (
-                <button type="button" onClick={toggleFollow} className={`btn btn-sm mt-7 ${isFollowing ? "btn-outline" : "btn-ink"}`}>
+                <button type="button" onClick={toggleFollow} disabled={pending} className={`btn btn-sm mt-7 ${isFollowing ? "btn-outline" : "btn-ink"}`}>
                   <i className={`fa-${isFollowing ? "solid" : "regular"} fa-user-plus mr-1`} />
                   {isFollowing ? "Mengikuti" : "Ikuti"}
                 </button>

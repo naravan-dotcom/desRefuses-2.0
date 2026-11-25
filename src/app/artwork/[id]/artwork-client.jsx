@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import StatusBadge from "@/components/ui/status-badge";
-import { REPORT_REASONS } from "@/lib/seed";
+import { REPORT_REASONS } from "@/lib/report-reasons";
 import { entriesToFormData } from "@/lib/form-data";
 import { addComment, deleteComment, submitReport, toggleFavorite, toggleLike } from "./actions";
 
